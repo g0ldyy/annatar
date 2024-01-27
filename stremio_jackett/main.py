@@ -1,12 +1,14 @@
-from typing import Any
+import json
+from typing import Any, Optional
 
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
 from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type: ignore
 
 from stremio_jackett import jackett
-from stremio_jackett.debrid.rd import get_movie_rd_links
-from stremio_jackett.stremio import Stream, StreamResponse
+from stremio_jackett.debrid import rd
+from stremio_jackett.jackett import JackettResult
+from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
 
 app = FastAPI()
 
@@ -38,9 +40,43 @@ async def search(
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
-    jacket_results = await jackett.search()
-    get_movie_rd_links
-    return StreamResponse(streams=[Stream()])
+    media_id = id.replace(".json", "").split(":")
+    season = int(media_id[0]) if len(media_id) > 0 else None
+    episode = int(media_id[1]) if len(media_id) > 1 else None
+    if season:
+        print(f"Searching for {type} {media_id}")
+    else:
+        print(f"Searching for {type} Season:{season} Episode:{episode}")
+
+    media_info = await get_media_info(id=media_id[0], type=type)
+    print(f"Found Media Info: {json.dumps(media_info)}")
+
+    jackett_results: list[JackettResult] = await jackett.search(
+        debrid_api_key=debridApiKey,
+        jackett_url=jackettUrl,
+        jackett_api_key=jackettApiKey,
+        service=streamService,
+        max_results=maxResults,
+        search_query=jackett.SearchQuery(
+            name=media_info.name,
+            type=type,
+            season=season,
+            episode=episode,
+        ),
+    )
+
+    torrent_links: list[str] = [l.url for l in jackett_results]
+    rd_links: dict[str, Optional[rd.UnrestrictedLink]] = await rd.get_movie_rd_links(
+        torrent_links=torrent_links, debrid_token=debridApiKey, season_episode=id
+    )
+    streams: list[Stream] = [
+        Stream(
+            title=media_info.name,
+            url=link.download,
+        )
+        for link in rd_links
+    ]
+    return StreamResponse(streams=streams)
 
     # return {
     #     "streams": [
