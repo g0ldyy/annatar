@@ -53,10 +53,11 @@ class MediaInfo(BaseModel):
 
 async def get_media_info(id: str, type: str) -> MediaInfo:
     async with aiohttp.ClientSession() as session:
-        api_url = f"https://v3-cinemeta.strem.io/meta/${type}/${id}.json"
+        api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
         async with session.get(api_url) as response:
             response_json = await response.json()
-            media_info = MediaInfo(**response_json)
+            meta = response_json["meta"]
+            media_info = MediaInfo(**meta)
             return media_info
 
 

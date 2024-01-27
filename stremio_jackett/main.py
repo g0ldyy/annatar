@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
 from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type: ignore
 
-from stremio_jackett import jackett
+from stremio_jackett import human, jackett
 from stremio_jackett.debrid import rd
 from stremio_jackett.jackett import JackettResult
 from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
@@ -30,7 +30,7 @@ async def get_manifest() -> dict[str, Any]:
     }
 
 
-@app.get("/stream/{type:str}/{id:str}")
+@app.get("/stream/{type:str}/{id:str}.json")
 async def search(
     type: str,
     id: str,
@@ -40,16 +40,20 @@ async def search(
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
-    media_id = id.replace(".json", "").split(":")
-    season = int(media_id[0]) if len(media_id) > 0 else None
-    episode = int(media_id[1]) if len(media_id) > 1 else None
-    if season:
-        print(f"Searching for {type} {media_id}")
-    else:
-        print(f"Searching for {type} Season:{season} Episode:{episode}")
+    title_id = id.split(":")[0]
+    print(f"Searching for {type} {id}")
 
-    media_info = await get_media_info(id=media_id[0], type=type)
-    print(f"Found Media Info: {json.dumps(media_info)}")
+    media_info = await get_media_info(id=title_id, type=type)
+    print(f"Found Media Info: {media_info.model_dump_json()}")
+
+    q = jackett.SearchQuery(
+        name=media_info.name,
+        type=type,
+    )
+
+    if type == "series":
+        q.season = int(id.split(":")[1])
+        q.episode = int(id.split(":")[2])
 
     jackett_results: list[JackettResult] = await jackett.search(
         debrid_api_key=debridApiKey,
@@ -57,12 +61,7 @@ async def search(
         jackett_api_key=jackettApiKey,
         service=streamService,
         max_results=maxResults,
-        search_query=jackett.SearchQuery(
-            name=media_info.name,
-            type=type,
-            season=season,
-            episode=episode,
-        ),
+        search_query=q,
     )
 
     torrent_links: list[str] = [l.url for l in jackett_results]
@@ -73,65 +72,18 @@ async def search(
         Stream(
             title=media_info.name,
             url=link.download,
+            name=f"{link.filename}\n{human.bytes(float(link.filesize))}",
         )
-        for link in rd_links
+        for _, link in rd_links.items()
+        if link
     ]
     return StreamResponse(streams=streams)
 
-    # return {
-    #     "streams": [
-    #         {
-    #             "title": "Test",
-    #             "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    #             "externalUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    #             "isFree": True,
-    #         }
-    #     ]
-    # }
-
-
-# routes.get("/:params/stream/:type/:id", async (req, res) => {
-# 	try {
-# 		const paramsJson = JSON.parse(atob(req.params.params));
-# 		const type = req.params.type;
-# 		const id = req.params.id.replace(".json", "").split(":");
-# 		const service = paramsJson.streamService;
-# 		const jackettUrl = paramsJson.jackettUrl;
-# 		const jackettApi = paramsJson.jackettApiKey;
-# 		const debridApi = paramsJson.debridApiKey;
-# 		const maxResults = clamp(1, paramsJson.maxResults || 5, 15);
-
-# 		const mediaName = await getName(id[0], type);
-# 		if (type === "movie") {
-# 			console.log(`Movie request. ID: ${id[0]} Name: ${mediaName}`);
-# 			const torrentInfo = await fetchResults(debridApi, jackettUrl, jackettApi, service, maxResults, {
-# 				name: mediaName,
-# 				type: type,
-# 			});
-# 			respond(res, { streams: torrentInfo });
-# 		}
-# 		if (type === "series") {
-# 			console.log(
-# 				`Series request. ID: ${id[0]} Name: "${mediaName}" Season: ${getNum(id[1])} Episode: ${getNum(
-# 					id[2],
-# 				)}`,
-# 			);
-# 			const torrentInfo = await fetchResults(debridApi, jackettUrl, jackettApi, service, maxResults, {
-# 				name: mediaName,
-# 				type: type,
-# 				season: getNum(id[1]),
-# 				episode: getNum(id[2]),
-# 			});
-# 			respond(res, { streams: torrentInfo });
-# 		}
-# 	} catch (e) {
-# 		console.log(e);
-# 		respond(res, noResults);
-# 	}
-# });
-
 
 if __name__ == "__main__":
-    FastAPIInstrumentor.instrument_app(app)
-    RequestsInstrumentor().instrument()
-    app.run()
+    FastAPIInstrumentor.instrument_app(app)  # type: ignore
+    RequestsInstrumentor().instrument()  # type: ignore
+
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)  # type: ignore
