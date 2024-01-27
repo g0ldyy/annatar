@@ -14,6 +14,8 @@ opentelemetry-sdk = "^1.22.0"
 opentelemetry-instrumentation-fastapi = "^0.43b0"
 opentelemetry-instrumentation-requests = "^0.43b0"
 opentelemetry-instrumentation-sqlite3 = "^0.43b0"
+pydantic = "^2.5.3"
+aiohttp = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.1.0"
@@ -23,3 +25,13 @@ pyright = "^1.1.348"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 100
+
+[tool.pyright]
+strict = ["stremio_jackett/*.py"]
+remove_redundant_aliases = true
