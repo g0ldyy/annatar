@@ -1,4 +1,3 @@
-import json
 from typing import Any, Optional
 
 from fastapi import FastAPI
