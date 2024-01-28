@@ -44,6 +44,9 @@ async def search(
     print(f"Searching for {type} {id}")
 
     media_info = await get_media_info(id=title_id, type=type)
+    if not media_info:
+        print(f"Error getting media info for {type} {id}")
+        return StreamResponse(streams=[], error="Error getting media info")
     print(f"Found Media Info: {media_info.model_dump_json()}")
 
     q = jackett.SearchQuery(
@@ -52,21 +55,25 @@ async def search(
     )
 
     if type == "series":
-        q.season = int(id.split(":")[1])
-        q.episode = int(id.split(":")[2])
+        q.season = id.split(":")[1]
+        q.episode = id.split(":")[2]
 
     jackett_results: list[JackettResult] = await jackett.search(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
         service=streamService,
-        max_results=maxResults,
+        max_results=20,
         search_query=q,
     )
 
     torrent_links: list[str] = [l.url for l in jackett_results]
+
     rd_links: dict[str, Optional[rd.UnrestrictedLink]] = await rd.get_movie_rd_links(
-        torrent_links=torrent_links, debrid_token=debridApiKey, season_episode=id
+        torrent_links=torrent_links,
+        debrid_token=debridApiKey,
+        season_episode=id,
+        max_results=maxResults,
     )
     streams: list[Stream] = [
         Stream(

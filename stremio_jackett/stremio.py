@@ -12,6 +12,7 @@ class Stream(BaseModel):
 
 class StreamResponse(BaseModel):
     streams: list[Stream]
+    error: str | None = None
 
 
 # export async function getName(id, type) {
@@ -51,10 +52,13 @@ class MediaInfo(BaseModel):
     website: Optional[str] = None
 
 
-async def get_media_info(id: str, type: str) -> MediaInfo:
+async def get_media_info(id: str, type: str) -> MediaInfo | None:
     async with aiohttp.ClientSession() as session:
         api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
         async with session.get(api_url) as response:
+            if response.status not in range(200, 300):
+                print(f"Error getting media info: {response.status}")
+                return None
             response_json = await response.json()
             meta = response_json["meta"]
             media_info = MediaInfo(**meta)

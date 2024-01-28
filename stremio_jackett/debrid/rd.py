@@ -12,16 +12,10 @@ import aiohttp
 
 
 class TorrentFile(BaseModel):
-    id: str
-    path: str
-    bytes: int = 0
-
-
-class File(BaseModel):
     id: int
     path: str
-    bytes: int
-    selected: int
+    bytes: int = 0
+    selected: int = 0
 
 
 class TorrentInfo(BaseModel):
@@ -36,7 +30,7 @@ class TorrentInfo(BaseModel):
     progress: int
     status: str
     added: str
-    files: list[File]
+    files: list[TorrentFile]
     links: list[str]
     ended: Optional[str] = None
     speed: Optional[int] = None
@@ -56,49 +50,63 @@ class UnrestrictedLink(BaseModel):
     streamable: int  # Is the file streamable on website
 
 
-async def select_biggest_file_season(files: list[TorrentFile], season_episode: str) -> int:
-    return int(next((file.id for file in files if season_episode and season_episode in file.path)))
+async def select_biggest_file(files: list[TorrentFile], season_episode: str | None) -> int:
+    if len(files) == 0:
+        return 0
+    if len(files) == 1:
+        return files[0].id
+
+    sorted_files: list[TorrentFile] = sorted(files, key=lambda f: f.bytes, reverse=True)
+    if not season_episode:
+        return sorted_files[0].id
+
+    for file in sorted_files:
+        if season_episode in file.path:
+            return file.id
+    return 0
 
 
-async def add_magnet_to_rd(magnet_link: str, debrid_token: str):
-    api_url = "{root_url}/torrents/addMagnet"
+async def add_magnet_to_rd(magnet_link: str, debrid_token: str) -> str | None:
+    api_url = f"{root_url}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
+            if response.status not in range(200, 300):
+                print(f"Error adding magnet to RD: {response.status}. Magnet: {magnet_link}")
+                return None
             response_json = await response.json()
             return response_json["id"]
 
 
 async def get_torrent_info(
     torrent_id: str, debrid_token: str, season_episode: Optional[str] = None
-) -> TorrentInfo:
+) -> TorrentInfo | None:
     api_url = f"{root_url}/torrents/info/{torrent_id}"
 
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
+            if response.status not in range(200, 300):
+                print(f"Error getting torrent info: {response.status}")
+                return None
             response_json = await response.json()
             torrent_info: TorrentInfo = TorrentInfo(**response_json)
             return torrent_info
 
 
 async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Optional[str] = None):
-    torrent_info: TorrentInfo = await get_torrent_info(
+    torrent_info: TorrentInfo | None = await get_torrent_info(
         torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
     )
 
-    torrent_files: list[TorrentFile] = torrent_info.files
-    max_index = (
-        await select_biggest_file_season(files=torrent_files, season_episode=season_episode)
-        if season_episode
-        else max(range(len(torrent_files)), key=lambda i: torrent_files[i].bytes)
-    )
+    if not torrent_info:
+        print("No torrent info found.")
+        return
 
-    torrent_file_id = (
-        torrent_files[max_index].id if season_episode else torrent_files[max_index - 1].id
-    )
+    torrent_files: list[TorrentFile] = torrent_info.files
+    torrent_file_id = await select_biggest_file(files=torrent_files, season_episode=season_episode)
     api_url = f"{root_url}/torrents/selectFiles/{torrent_id}"
     body = {"files": torrent_file_id}
 
@@ -111,39 +119,48 @@ async def get_movie_rd_link(
     torrent_link: str, season_episode: str, debrid_token: str
 ) -> UnrestrictedLink | None:
     torrent_id = await add_magnet_to_rd(magnet_link=torrent_link, debrid_token=debrid_token)
-    print(f"Magnet added to RD. ID: {torrent_id}")
+    if not torrent_id:
+        print("No torrent found on RD.")
+        return None
 
+    print(f"torrent:{torrent_id}: Magnet added to RD. ID: {torrent_id}. Magnet: {torrent_link}")
     if season_episode:
-        print("Setting episode file for season/episode...")
+        print(f"torrent:{torrent_id}: Setting episode file for season/episode...")
         await set_file_rd(
             torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
         )
     else:
-        print("Setting movie file...")
+        print(f"torrent:{torrent_id}: Setting movie file...")
         await set_file_rd(torrent_id=torrent_id, debrid_token=debrid_token)
 
-    print("Waiting for RD link...")
-    torrent_info: TorrentInfo = await get_torrent_info(
+    torrent_info: TorrentInfo | None = await get_torrent_info(
         torrent_id=torrent_id, season_episode=season_episode, debrid_token=debrid_token
     )
 
+    if not torrent_info:
+        print(f"torrent:{torrent_id}: No torrent info found.")
+        return None
+
     if len(torrent_info.links) >= 1:
-        print("RD link found.")
+        print(f"torrent:{torrent_id}: RD link found.")
     else:
-        print("No RD link found.")
+        print(f"torrent:{torrent_id}: No RD link found.")
         return None
 
     download_link = torrent_info.links[0]
-    api_url = "{root_url}/unrestrict/link"
+    api_url = f"{root_url}/unrestrict/link"
     body = {"link": download_link}
 
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
+            if response.status not in range(200, 300):
+                print(f"torrent:{torrent_id}: Error getting unrestrict/link: {response.status}")
+                return None
             unrestrict_response_json = await response.json()
 
     unrestrict_info: UnrestrictedLink = UnrestrictedLink(**unrestrict_response_json)
-    print(f"RD link: {unrestrict_info.download}")
+    print(f"torrent:{torrent_id}: RD link: {unrestrict_info.download}")
     return unrestrict_info
 
 
@@ -151,6 +168,7 @@ async def get_movie_rd_links(
     torrent_links: list[str],
     debrid_token: str,
     season_episode: str,
+    max_results: int = 5,
 ) -> dict[str, Optional[UnrestrictedLink]]:
     """
     Generates a list of RD links for each torrent link.
