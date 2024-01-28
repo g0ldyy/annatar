@@ -6,6 +6,8 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
+from stremio_jackett.torrent import Torrent
+
 
 class TorrentFile(BaseModel):
     id: int
@@ -35,6 +37,7 @@ class TorrentInfo(BaseModel):
 
 class UnrestrictedLink(BaseModel):
     id: str
+    torrent: Torrent
     filename: str
     mimeType: str  # Mime Type of the file, guessed by the file extension
     filesize: int  # Filesize in bytes, 0 if unknown

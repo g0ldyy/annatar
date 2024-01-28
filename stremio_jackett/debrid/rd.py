@@ -7,6 +7,7 @@ import aiohttp
 from pydantic import BaseModel
 
 from stremio_jackett.debrid.rd_models import TorrentFile, TorrentInfo, UnrestrictedLink
+from stremio_jackett.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
@@ -89,13 +90,13 @@ async def select_torrent_file(
 
 
 async def get_stream_link(
-    torrent_link: str,
+    torrent: Torrent,
     season_episode: str,
     debrid_token: str,
 ) -> UnrestrictedLink | None:
-    torrent_id = await add_link(magnet_link=torrent_link, debrid_token=debrid_token)
+    torrent_id = await add_link(magnet_link=torrent.url, debrid_token=debrid_token)
     if not torrent_id:
-        print(f"No torrent for {torrent_link}.")
+        print(f"No torrent for {torrent.url}.")
         return None
 
     print(f"torrent:{torrent_id}: Magnet added to RD")
@@ -134,6 +135,7 @@ async def get_stream_link(
                 print(f"torrent:{torrent_id}: Error getting unrestrict/link: {response.status}")
                 return None
             unrestrict_response_json = await response.json()
+            unrestrict_response_json["torrent"] = torrent
 
     unrestrict_info: UnrestrictedLink = UnrestrictedLink(**unrestrict_response_json)
     print(f"torrent:{torrent_id}: RD link: {unrestrict_info.download}")
@@ -149,23 +151,25 @@ async def delete_torrent(torrent_id: str, debrid_token: str):
 
 
 async def get_stream_links(
-    torrent_links: list[str],
+    torrents: list[Torrent],
     debrid_token: str,
     season_episode: str,
     max_results: int = 5,
-) -> dict[str, Optional[UnrestrictedLink]]:
+) -> list[UnrestrictedLink]:
     """
     Generates a list of RD links for each torrent link.
     """
 
-    def __run(torrent_link) -> Optional[UnrestrictedLink]:
+    def __run(torrent: Torrent) -> Optional[UnrestrictedLink]:
         return asyncio.run(
             get_stream_link(
-                torrent_link=torrent_link, season_episode=season_episode, debrid_token=debrid_token
+                torrent=torrent,
+                season_episode=season_episode,
+                debrid_token=debrid_token,
             )
         )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(__run, torrent_links))
+        results = list(executor.map(__run, torrents))
 
-    return {torrent_links[i]: result for i, result in enumerate(results) if result is not None}
+    return [r for r in results if r]

@@ -1,17 +1,16 @@
 import asyncio
 import json
+import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
 import aiohttp
+from diskcache import Cache  # type: ignore
 from pydantic import BaseModel
 
+from stremio_jackett.torrent import Torrent
 
-class JackettResult(BaseModel):
-    size: int
-    title: str
-    url: str
-    seeders: int
+cache: Cache = Cache(__name__)
 
 
 class SearchQuery(BaseModel):
@@ -27,7 +26,7 @@ async def search(
     jackett_api_key: str,
     search_query: SearchQuery,
     max_results: int,
-) -> list[JackettResult]:
+) -> list[Torrent]:
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results/torznab/api"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
@@ -51,19 +50,24 @@ async def search(
     return []
 
 
-async def parse_xml(xml: str, limit: int) -> list[JackettResult]:
-    # print(f"Parsing XML: \n{xml}")
+async def parse_xml(xml: str, limit: int) -> list[Torrent]:
+    print(f"Parsing XML: \n{xml}")
     root = ET.fromstring(xml)
     channel = root.find("channel")
     items = channel.findall("item") if channel is not None else []
 
-    results: list[JackettResult] = await asyncio.gather(
+    results: list[Torrent] = await asyncio.gather(
         *[parse_xml_result(item) for item in items[:limit]]
     )
     return sorted(results, key=lambda x: (x.seeders or 0), reverse=True)
 
 
-async def parse_xml_result(item: Any) -> JackettResult:
+def magnet_to_info_hash(magnet_link: str):
+    match = re.search("btih:([a-zA-Z0-9]+)", magnet_link)
+    return match.group(1) if match else None
+
+
+async def parse_xml_result(item: Any) -> Torrent:
     torznab_attr = item.find("torznab:attr")
     seeders = 0
     if torznab_attr is not None:
@@ -72,9 +76,16 @@ async def parse_xml_result(item: Any) -> JackettResult:
             seeders = int(seeders_attr.get("value", "0"))
 
     url: str = item.findtext("link", "")
+    guid: str = item.findtext("guid", "")
+
     if not url.startswith("magnet"):
-        url = await resolve_magnet_link(url)
-    return JackettResult(
+        url = await resolve_magnet_link(guid=guid, link=url)
+
+    info_hash: str = item.findtext("infohash", magnet_to_info_hash(url))
+
+    return Torrent(
+        guid=guid,
+        info_hash=info_hash,
         title=item.findtext("title", ""),
         size=int(item.findtext("size", "0")),
         url=url,
@@ -82,7 +93,7 @@ async def parse_xml_result(item: Any) -> JackettResult:
     )
 
 
-async def resolve_magnet_link(link: str) -> str:
+async def resolve_magnet_link(guid: str, link: str) -> str:
     """
     Jackett sometimes does not have a magnet link but a local URL that
     redirects to a magnet link. This will not work if adding to RD and
@@ -91,6 +102,9 @@ async def resolve_magnet_link(link: str) -> str:
     """
     if link.startswith("magnet"):
         return link
+    if guid in cache:
+        return cache.get(guid)  # type: ignore
+
     print(f"Following redirect for {link}")
     async with aiohttp.ClientSession() as session:
         async with session.get(link, allow_redirects=False) as response:

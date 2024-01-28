@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
@@ -6,8 +6,8 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type:
 
 from stremio_jackett import human, jackett
 from stremio_jackett.debrid import rd
-from stremio_jackett.jackett import JackettResult
 from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
+from stremio_jackett.torrent import Torrent
 
 app = FastAPI()
 
@@ -39,6 +39,7 @@ async def search(
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
+    print(f"Received request for {type} {id}")
     title_id = id.split(":")[0]
     print(f"Searching for {type} {id}")
 
@@ -57,7 +58,7 @@ async def search(
         q.season = id.split(":")[1]
         q.episode = id.split(":")[2]
 
-    jackett_results: list[JackettResult] = await jackett.search(
+    torrents: list[Torrent] = await jackett.search(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
@@ -65,23 +66,22 @@ async def search(
         search_query=q,
     )
 
-    torrent_links: list[str] = [l.url for l in jackett_results]
-
     # make get_movie_rd_links return a better struct with more info like
     # resolution (4K) and audio channels (5.1)
-    rd_links: dict[str, Optional[rd.UnrestrictedLink]] = await rd.get_stream_links(
-        torrent_links=torrent_links,
+    rd_links: list[rd.UnrestrictedLink] = await rd.get_stream_links(
+        torrents=torrents,
         debrid_token=debridApiKey,
         season_episode=id,
         max_results=maxResults,
     )
+
     streams: list[Stream] = [
         Stream(
             title=media_info.name,
             url=link.download,
             name=f"{link.filename}\n{human.bytes(float(link.filesize))}",
         )
-        for _, link in rd_links.items()
+        for link in rd_links
         if link
     ]
     return StreamResponse(streams=streams)
