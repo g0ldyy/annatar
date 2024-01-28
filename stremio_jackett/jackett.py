@@ -1,3 +1,4 @@
+import asyncio
 import json
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -24,7 +25,6 @@ async def search(
     debrid_api_key: str,
     jackett_url: str,
     jackett_api_key: str,
-    service: str,
     search_query: SearchQuery,
     max_results: int,
 ) -> list[JackettResult]:
@@ -52,27 +52,54 @@ async def search(
 
 
 async def parse_xml(xml: str, limit: int) -> list[JackettResult]:
-    print(f"Parsing XML: \n{xml}")
+    # print(f"Parsing XML: \n{xml}")
     root = ET.fromstring(xml)
     channel = root.find("channel")
     items = channel.findall("item") if channel is not None else []
 
-    extracted_data: list[JackettResult] = []
-    for item in items[:limit]:
-        torznab_attr = item.find("torznab:attr")
-        seeders = 0
-        if torznab_attr is not None:
-            seeders_attr = torznab_attr.find("./[@name='seeders']")
-            if seeders_attr is not None:
-                seeders = int(seeders_attr.get("value", "0"))
+    results: list[JackettResult] = await asyncio.gather(
+        *[parse_xml_result(item) for item in items[:limit]]
+    )
+    return sorted(results, key=lambda x: (x.seeders or 0), reverse=True)
 
-        extracted_data.append(
-            JackettResult(
-                title=item.findtext("title", ""),
-                size=int(item.findtext("size", "0")),
-                url=item.findtext("link", ""),
-                seeders=seeders,
-            )
-        )
 
-    return sorted(extracted_data, key=lambda x: (x.seeders or 0), reverse=True)
+async def parse_xml_result(item: Any) -> JackettResult:
+    torznab_attr = item.find("torznab:attr")
+    seeders = 0
+    if torznab_attr is not None:
+        seeders_attr = torznab_attr.find("./[@name='seeders']")
+        if seeders_attr is not None:
+            seeders = int(seeders_attr.get("value", "0"))
+
+    url: str = item.findtext("link", "")
+    if not url.startswith("magnet"):
+        url = await resolve_magnet_link(url)
+    return JackettResult(
+        title=item.findtext("title", ""),
+        size=int(item.findtext("size", "0")),
+        url=url,
+        seeders=seeders,
+    )
+
+
+async def resolve_magnet_link(link: str) -> str:
+    """
+    Jackett sometimes does not have a magnet link but a local URL that
+    redirects to a magnet link. This will not work if adding to RD and
+    Jackett is not publicly hosted. Most of the time we can resolve it
+    locally. If not we will just pass it along to RD anyway
+    """
+    if link.startswith("magnet"):
+        return link
+    print(f"Following redirect for {link}")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(link, allow_redirects=False) as response:
+            if response.status == 302:
+                location = response.headers.get("Location", "")
+                print(f"Updated link to {location}.")
+                return location
+            else:
+                print(
+                    f"Didn't find redirect: {response.status}. Trying anyway but this may fail if Jackett is not public."
+                )
+                return link

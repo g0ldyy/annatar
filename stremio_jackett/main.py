@@ -61,7 +61,6 @@ async def search(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
-        service=streamService,
         max_results=maxResults,
         search_query=q,
     )

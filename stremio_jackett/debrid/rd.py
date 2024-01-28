@@ -11,7 +11,10 @@ from stremio_jackett.debrid.rd_models import TorrentFile, TorrentInfo, Unrestric
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
 
-async def select_biggest_file(files: list[TorrentFile], season_episode: str | None) -> int:
+async def select_biggest_file(
+    files: list[TorrentFile],
+    season_episode: str | None,
+) -> int:
     if len(files) == 0:
         return 0
     if len(files) == 1:
@@ -27,23 +30,7 @@ async def select_biggest_file(files: list[TorrentFile], season_episode: str | No
     return 0
 
 
-async def add_link(link: str, debrid_token: str) -> str | None:
-    magnet_link: str = link
-    if link.startswith("http"):
-        # Jackett sometimes does not have a magnet link but a local URL that
-        # redirects to a magnet link. This will not work if adding to RD and
-        # Jackett is not publicly hosted. Most of the time we can resolve it
-        # locally. If not we will just pass it along to RD anyway
-        print(f"Following redirect for {link}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(link, allow_redirects=False) as response:
-                if response.status == 302:
-                    magnet_link = response.headers.get("Location", default=link)
-                else:
-                    print(
-                        f"Didn't find redirect: {response.status}. Trying anyway but this may fail if Jackett is not public."
-                    )
-
+async def add_link(magnet_link: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
@@ -59,7 +46,9 @@ async def add_link(link: str, debrid_token: str) -> str | None:
 
 
 async def get_torrent_info(
-    torrent_id: str, debrid_token: str, season_episode: Optional[str] = None
+    torrent_id: str,
+    debrid_token: str,
+    season_episode: Optional[str] = None,
 ) -> TorrentInfo | None:
     api_url = f"{ROOT_URL}/torrents/info/{torrent_id}"
 
@@ -74,9 +63,15 @@ async def get_torrent_info(
             return torrent_info
 
 
-async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Optional[str] = None):
+async def select_torrent_file(
+    torrent_id: str,
+    debrid_token: str,
+    season_episode: Optional[str] = None,
+):
     torrent_info: TorrentInfo | None = await get_torrent_info(
-        torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
+        torrent_id=torrent_id,
+        debrid_token=debrid_token,
+        season_episode=season_episode,
     )
 
     if not torrent_info:
@@ -94,22 +89,24 @@ async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Option
 
 
 async def get_stream_link(
-    torrent_link: str, season_episode: str, debrid_token: str
+    torrent_link: str,
+    season_episode: str,
+    debrid_token: str,
 ) -> UnrestrictedLink | None:
-    torrent_id = await add_link(link=torrent_link, debrid_token=debrid_token)
+    torrent_id = await add_link(magnet_link=torrent_link, debrid_token=debrid_token)
     if not torrent_id:
-        print("No torrent found on RD.")
+        print(f"No torrent for {torrent_link}.")
         return None
 
     print(f"torrent:{torrent_id}: Magnet added to RD")
     if season_episode:
         print(f"torrent:{torrent_id}: Setting episode file for season/episode...")
-        await set_file_rd(
+        await select_torrent_file(
             torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
         )
     else:
         print(f"torrent:{torrent_id}: Setting movie file...")
-        await set_file_rd(torrent_id=torrent_id, debrid_token=debrid_token)
+        await select_torrent_file(torrent_id=torrent_id, debrid_token=debrid_token)
 
     torrent_info: TorrentInfo | None = await get_torrent_info(
         torrent_id=torrent_id, season_episode=season_episode, debrid_token=debrid_token
@@ -123,6 +120,7 @@ async def get_stream_link(
         print(f"torrent:{torrent_id}: RD link found.")
     else:
         print(f"torrent:{torrent_id}: No RD link found. Torrent is not cached. Skipping")
+        await delete_torrent(torrent_id=torrent_id, debrid_token=debrid_token)
         return None
 
     download_link = torrent_info.links[0]
@@ -140,6 +138,14 @@ async def get_stream_link(
     unrestrict_info: UnrestrictedLink = UnrestrictedLink(**unrestrict_response_json)
     print(f"torrent:{torrent_id}: RD link: {unrestrict_info.download}")
     return unrestrict_info
+
+
+async def delete_torrent(torrent_id: str, debrid_token: str):
+    async with aiohttp.ClientSession() as session:
+        api_url = f"{ROOT_URL}/torrents/delete/{torrent_id}"
+        api_headers = {"Authorization": f"Bearer {debrid_token}"}
+        async with session.delete(api_url, headers=api_headers) as response:
+            print(f"torrent:{torrent_id} cleaned up torrent")
 
 
 async def get_stream_links(
