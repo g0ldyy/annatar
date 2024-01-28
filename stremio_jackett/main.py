@@ -79,7 +79,12 @@ async def search(
         Stream(
             title=media_info.name,
             url=link.download,
-            name=f"{link.filename}\n{human.bytes(float(link.filesize))}",
+            name="\n".join(
+                [
+                    link.filename,
+                    f"💾{human.bytes(float(link.filesize))}",
+                ]
+            ),
         )
         for link in rd_links
         if link
