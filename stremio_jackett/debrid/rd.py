@@ -159,7 +159,7 @@ async def get_movie_rd_link(
     if len(torrent_info.links) >= 1:
         print(f"torrent:{torrent_id}: RD link found.")
     else:
-        print(f"torrent:{torrent_id}: No RD link found.")
+        print(f"torrent:{torrent_id}: No RD link found. Torrent is not cached. Skipping")
         return None
 
     download_link = torrent_info.links[0]
