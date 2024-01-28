@@ -9,6 +9,18 @@ from pydantic import BaseModel
 from stremio_jackett.torrent import Torrent
 
 
+class InstantFile(BaseModel):
+    id: int
+    filename: str
+    filesize: int
+
+
+class StreamableFile(BaseModel):
+    id: int
+    link: str
+    size: int
+
+
 class TorrentFile(BaseModel):
     id: int
     path: str
