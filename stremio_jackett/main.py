@@ -68,7 +68,9 @@ async def search(
 
     torrent_links: list[str] = [l.url for l in jackett_results]
 
-    rd_links: dict[str, Optional[rd.UnrestrictedLink]] = await rd.get_movie_rd_links(
+    # make get_movie_rd_links return a better struct with more info like
+    # resolution (4K) and audio channels (5.1)
+    rd_links: dict[str, Optional[rd.UnrestrictedLink]] = await rd.get_stream_links(
         torrent_links=torrent_links,
         debrid_token=debridApiKey,
         season_episode=id,

@@ -6,46 +6,9 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
+from stremio_jackett.debrid.rd_models import TorrentFile, TorrentInfo, UnrestrictedLink
+
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
-
-
-class TorrentFile(BaseModel):
-    id: int
-    path: str
-    bytes: int = 0
-    selected: int = 0
-
-
-class TorrentInfo(BaseModel):
-    id: str
-    filename: str
-    original_filename: str
-    hash: str
-    bytes: int
-    original_bytes: int
-    host: str
-    split: int
-    progress: int
-    status: str
-    added: str
-    files: list[TorrentFile]
-    links: list[str]
-    ended: Optional[str] = None
-    speed: Optional[int] = None
-    seeders: Optional[int] = None
-
-
-class UnrestrictedLink(BaseModel):
-    id: str
-    filename: str
-    mimeType: str  # Mime Type of the file, guessed by the file extension
-    filesize: int  # Filesize in bytes, 0 if unknown
-    link: str  # Original link
-    host: str  # Host main domain
-    chunks: int  # Max Chunks allowed
-    crc: int  # Disable / enable CRC check
-    download: str  # Generated link
-    streamable: int  # Is the file streamable on website
 
 
 async def select_biggest_file(files: list[TorrentFile], season_episode: str | None) -> int:
@@ -64,7 +27,7 @@ async def select_biggest_file(files: list[TorrentFile], season_episode: str | No
     return 0
 
 
-async def add_link_to_rd(link: str, debrid_token: str) -> str | None:
+async def add_link(link: str, debrid_token: str) -> str | None:
     magnet_link: str = link
     if link.startswith("http"):
         # Jackett sometimes does not have a magnet link but a local URL that
@@ -130,10 +93,10 @@ async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Option
         await session.post(api_url, headers=api_headers, data=body)
 
 
-async def get_movie_rd_link(
+async def get_stream_link(
     torrent_link: str, season_episode: str, debrid_token: str
 ) -> UnrestrictedLink | None:
-    torrent_id = await add_link_to_rd(link=torrent_link, debrid_token=debrid_token)
+    torrent_id = await add_link(link=torrent_link, debrid_token=debrid_token)
     if not torrent_id:
         print("No torrent found on RD.")
         return None
@@ -179,7 +142,7 @@ async def get_movie_rd_link(
     return unrestrict_info
 
 
-async def get_movie_rd_links(
+async def get_stream_links(
     torrent_links: list[str],
     debrid_token: str,
     season_episode: str,
@@ -191,7 +154,7 @@ async def get_movie_rd_links(
 
     def __run(torrent_link) -> Optional[UnrestrictedLink]:
         return asyncio.run(
-            get_movie_rd_link(
+            get_stream_link(
                 torrent_link=torrent_link, season_episode=season_episode, debrid_token=debrid_token
             )
         )
