@@ -20,7 +20,6 @@ class SearchQuery(BaseModel):
     episode: str | None = None
 
 
-# debridApi, jackettUrl, jackettApi, service, maxResults
 async def search(
     debrid_api_key: str,
     jackett_url: str,
@@ -67,21 +66,11 @@ async def parse_xml(xml: str, limit: int) -> list[JackettResult]:
             if seeders_attr is not None:
                 seeders = int(seeders_attr.get("value", "0"))
 
-        url: str = item.findtext("link", "")
-        if url.startswith("http"):
-            print(f"Following redirect for {url}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, allow_redirects=False) as response:
-                    if response.status == 302:
-                        url = response.headers.get("Location", default=url)
-                    else:
-                        print(f"Didn't find redirect: {response.status}")
-
         extracted_data.append(
             JackettResult(
                 title=item.findtext("title", ""),
                 size=int(item.findtext("size", "0")),
-                url=url,
+                url=item.findtext("link", ""),
                 seeders=seeders,
             )
         )

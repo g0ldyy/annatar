@@ -1,14 +1,12 @@
+import asyncio
 import concurrent.futures
 from os import getenv
 from typing import Optional
 
+import aiohttp
 from pydantic import BaseModel
 
-root_url = "https://api.real-debrid.com/rest/1.0"
-
-import asyncio
-
-import aiohttp
+ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
 
 class TorrentFile(BaseModel):
@@ -66,24 +64,41 @@ async def select_biggest_file(files: list[TorrentFile], season_episode: str | No
     return 0
 
 
-async def add_magnet_to_rd(magnet_link: str, debrid_token: str) -> str | None:
-    api_url = f"{root_url}/torrents/addMagnet"
+async def add_link_to_rd(link: str, debrid_token: str) -> str | None:
+    magnet_link: str = link
+    if link.startswith("http"):
+        # Jackett sometimes does not have a magnet link but a local URL that
+        # redirects to a magnet link. This will not work if adding to RD and
+        # Jackett is not publicly hosted. Most of the time we can resolve it
+        # locally. If not we will just pass it along to RD anyway
+        print(f"Following redirect for {link}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link, allow_redirects=False) as response:
+                if response.status == 302:
+                    magnet_link = response.headers.get("Location", default=link)
+                else:
+                    print(
+                        f"Didn't find redirect: {response.status}. Trying anyway but this may fail if Jackett is not public."
+                    )
+
+    api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
+            print(f"Got status adding magnet to RD: status={response.status}, magnet={magnet_link}")
             if response.status not in range(200, 300):
-                print(f"Error adding magnet to RD: {response.status}. Magnet: {magnet_link}")
                 return None
             response_json = await response.json()
+            print(f"Magnet added to RD: Torrent:{magnet_link}")
             return response_json["id"]
 
 
 async def get_torrent_info(
     torrent_id: str, debrid_token: str, season_episode: Optional[str] = None
 ) -> TorrentInfo | None:
-    api_url = f"{root_url}/torrents/info/{torrent_id}"
+    api_url = f"{ROOT_URL}/torrents/info/{torrent_id}"
 
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
@@ -107,7 +122,7 @@ async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Option
 
     torrent_files: list[TorrentFile] = torrent_info.files
     torrent_file_id = await select_biggest_file(files=torrent_files, season_episode=season_episode)
-    api_url = f"{root_url}/torrents/selectFiles/{torrent_id}"
+    api_url = f"{ROOT_URL}/torrents/selectFiles/{torrent_id}"
     body = {"files": torrent_file_id}
 
     async with aiohttp.ClientSession() as session:
@@ -118,12 +133,12 @@ async def set_file_rd(torrent_id: str, debrid_token: str, season_episode: Option
 async def get_movie_rd_link(
     torrent_link: str, season_episode: str, debrid_token: str
 ) -> UnrestrictedLink | None:
-    torrent_id = await add_magnet_to_rd(magnet_link=torrent_link, debrid_token=debrid_token)
+    torrent_id = await add_link_to_rd(link=torrent_link, debrid_token=debrid_token)
     if not torrent_id:
         print("No torrent found on RD.")
         return None
 
-    print(f"torrent:{torrent_id}: Magnet added to RD. ID: {torrent_id}. Magnet: {torrent_link}")
+    print(f"torrent:{torrent_id}: Magnet added to RD")
     if season_episode:
         print(f"torrent:{torrent_id}: Setting episode file for season/episode...")
         await set_file_rd(
@@ -148,7 +163,7 @@ async def get_movie_rd_link(
         return None
 
     download_link = torrent_info.links[0]
-    api_url = f"{root_url}/unrestrict/link"
+    api_url = f"{ROOT_URL}/unrestrict/link"
     body = {"link": download_link}
 
     async with aiohttp.ClientSession() as session:
