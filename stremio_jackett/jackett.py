@@ -59,7 +59,7 @@ async def parse_xml(xml: str, limit: int) -> list[JackettResult]:
     items = channel.findall("item") if channel is not None else []
 
     extracted_data: list[JackettResult] = []
-    for item in items:
+    for item in items[:limit]:
         torznab_attr = item.find("torznab:attr")
         seeders = 0
         if torznab_attr is not None:
@@ -67,13 +67,23 @@ async def parse_xml(xml: str, limit: int) -> list[JackettResult]:
             if seeders_attr is not None:
                 seeders = int(seeders_attr.get("value", "0"))
 
+        url: str = item.findtext("link", "")
+        if url.startswith("http"):
+            print(f"Following redirect for {url}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, allow_redirects=False) as response:
+                    if response.status == 302:
+                        url = response.headers.get("Location", default=url)
+                    else:
+                        print(f"Didn't find redirect: {response.status}")
+
         extracted_data.append(
             JackettResult(
                 title=item.findtext("title", ""),
                 size=int(item.findtext("size", "0")),
-                url=item.findtext("link", ""),
+                url=url,
                 seeders=seeders,
             )
         )
 
-    return sorted(extracted_data, key=lambda x: (x.seeders or 0), reverse=True)[:limit]
+    return sorted(extracted_data, key=lambda x: (x.seeders or 0), reverse=True)

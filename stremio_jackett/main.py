@@ -63,7 +63,7 @@ async def search(
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
         service=streamService,
-        max_results=20,
+        max_results=maxResults,
         search_query=q,
     )
 
