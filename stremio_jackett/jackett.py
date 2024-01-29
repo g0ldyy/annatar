@@ -25,6 +25,7 @@ async def search(
     jackett_api_key: str,
     search_query: SearchQuery,
     max_results: int,
+    imdb: int | None = None,
 ) -> list[Torrent]:
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
@@ -58,6 +59,9 @@ async def search(
         if len(torrents) >= max_results:
             return torrents
 
+        if imdb and r.Imdb and r.Imdb != imdb:
+            print(f"Skipping mismatched IMDB {r.Imdb} for {r.Title}. Expected {imdb}")
+            continue
         if r.InfoHash and r.MagnetUri:
             torrents.append(
                 Torrent(

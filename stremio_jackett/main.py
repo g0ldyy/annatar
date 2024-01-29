@@ -40,10 +40,10 @@ async def search(
     maxResults: int = 5,
 ) -> StreamResponse:
     print(f"Received request for {type} {id}")
-    title_id = id.split(":")[0]
+    imdb_id = id.split(":")[0]
     print(f"Searching for {type} {id}")
 
-    media_info = await get_media_info(id=title_id, type=type)
+    media_info = await get_media_info(id=imdb_id, type=type)
     if not media_info:
         print(f"Error getting media info for {type} {id}")
         return StreamResponse(streams=[], error="Error getting media info")
@@ -62,8 +62,9 @@ async def search(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
-        max_results=10,
+        max_results=maxResults,
         search_query=q,
+        imdb=int(imdb_id.replace("tt", "")),
     )
 
     # print(f"Found {len(torrents)} torrents for {type} {id}")
@@ -79,6 +80,9 @@ async def search(
         season_episode="E".join(id.split(":")[1:]),
         max_results=maxResults,
     )
+
+    # sort by size
+    # rd_links.sort(key=lambda link: link.filesize, reverse=True)
 
     streams: list[Stream] = [
         Stream(

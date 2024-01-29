@@ -77,9 +77,11 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
                 return []
             res = await response.json()
 
+    # print(f"torrent:{info_hash}: Got instant availability: {json.dumps(res, indent=2)}")
     cached_files: list[InstantFile] = [
         InstantFile(id=int(id_key), **file_info)
         for value in res.values()
+        if value
         for item in value.get("rd", [])
         for id_key, file_info in item.items()
     ]
