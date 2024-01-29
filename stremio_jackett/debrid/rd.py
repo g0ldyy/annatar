@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import json
 from os import getenv
 from typing import Optional
 
@@ -50,6 +51,7 @@ async def add_link(magnet_link: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
@@ -63,6 +65,7 @@ async def add_link(magnet_link: str, debrid_token: str) -> str | None:
 
 async def get_instant_availability(info_hash: str, debrid_token: str) -> list[InstantFile]:
     api_url = f"{ROOT_URL}/torrents/instantAvailability/{info_hash}"
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
@@ -73,27 +76,20 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
                 response.raise_for_status()
                 return []
             res = await response.json()
-            if info_hash not in res or not res[info_hash]:
-                print(f"torrent:{info_hash}: No cached torrent files")
-                return []
-            cached_files: list[InstantFile] = []
-            if "rd" not in res[info_hash]:
-                print(f"torrent instantAvailablity is malfored: {res}")
-                return []
-            for item in res[info_hash]["rd"]:
-                for id, file in item.items():
-                    cached_files.append(
-                        InstantFile(
-                            id=id,
-                            filename=file["filename"],
-                            filesize=file["filesize"],
-                        )
-                    )
-            return cached_files
+
+    cached_files: list[InstantFile] = [
+        InstantFile(id=int(id_key), **file_info)
+        for value in res.values()
+        for item in value.get("rd", [])
+        for id_key, file_info in item.items()
+    ]
+    print(f"Found {len(cached_files)} cached files.")
+    return cached_files
 
 
 async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents"
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
@@ -101,18 +97,20 @@ async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
                 print(f"Error getting torrent list: {response.status}")
                 return None
             response_json = await response.json()
-            # parse list of TorrentInfo from response.json()
-            for torrent in response_json:
-                if torrent["hash"] != info_hash:
-                    continue
-                links = torrent["links"]
-                if links:
-                    link = links[0]
-                    print(f"torrent:{info_hash}: Torrent link found: {link}")
-                    return link
-                else:
-                    print(f"torrent:{info_hash}: Torrent has no links?")
-                    return None
+    # parse list of TorrentInfo from response.json()
+    print(f"torrent:{info_hash}: Got torrent list: {json.dumps(response_json, indent=2)}")
+    for torrent in response_json:
+        if torrent["hash"].lower() != info_hash.lower():
+            continue
+        links = torrent["links"]
+        if links:
+            link = links[0]
+            print(f"torrent:{info_hash}: Torrent link found: {link}")
+            return link
+        else:
+            print(f"torrent:{info_hash}: Torrent has no links?")
+            return None
+    print(f"torrent:{info_hash}: Torrent not found in list.")
     return None
 
 
@@ -121,6 +119,7 @@ async def get_torrent_info(
     debrid_token: str,
 ) -> TorrentInfo | None:
     api_url = f"{ROOT_URL}/torrents/info/{torrent_id}"
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
@@ -152,6 +151,7 @@ async def select_torrent_file(
     api_url = f"{ROOT_URL}/torrents/selectFiles/{torrent_id}"
     body = {"files": torrent_file_id}
 
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         await session.post(api_url, headers=api_headers, data=body)
@@ -165,6 +165,7 @@ async def unrestrict_link(
     api_url = f"{ROOT_URL}/unrestrict/link"
     body = {"link": link}
 
+    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
@@ -189,7 +190,6 @@ async def get_stream_link(
         torrent.info_hash, debrid_token
     )
     if not cached_files:
-        print(f"torrent:{torrent.info_hash}: No cached files found.")
         return None
     print(f"torrent:{torrent.info_hash}: {len(cached_files)} cached files found.")
 
