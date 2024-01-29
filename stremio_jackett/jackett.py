@@ -1,22 +1,12 @@
 import json
 import re
+from functools import lru_cache
 from typing import Any
 
 import aiohttp
-from diskcache import Cache  # type: ignore
-from pydantic import BaseModel
 
-from stremio_jackett.jackett_models import SearchResult
+from stremio_jackett.jackett_models import SearchQuery, SearchResult
 from stremio_jackett.torrent import Torrent
-
-cache: Cache = Cache(__name__)
-
-
-class SearchQuery(BaseModel):
-    name: str
-    type: str
-    season: str | None = None
-    episode: str | None = None
 
 
 async def search(
@@ -76,7 +66,7 @@ async def search(
             continue
 
         elif r.Link and r.Link.startswith("http"):
-            magnet_link: str = await resolve_magnet_link(guid=r.Guid, link=r.Link)
+            magnet_link: str | None = await resolve_magnet_link(guid=r.Guid, link=r.Link)
             if not magnet_link:
                 print(f"Could not resolve magnet link for {r.Link}. Skipping")
                 continue
@@ -102,7 +92,8 @@ def magnet_to_info_hash(magnet_link: str):
     return match.group(1) if match else None
 
 
-async def resolve_magnet_link(guid: str, link: str) -> str:
+@lru_cache(maxsize=1024, typed=True)
+async def resolve_magnet_link(guid: str, link: str) -> str | None:
     """
     Jackett sometimes does not have a magnet link but a local URL that
     redirects to a magnet link. This will not work if adding to RD and
@@ -111,8 +102,6 @@ async def resolve_magnet_link(guid: str, link: str) -> str:
     """
     if link.startswith("magnet"):
         return link
-    if guid in cache:
-        return cache.get(guid)  # type: ignore
 
     print(f"Following redirect for {link}")
     async with aiohttp.ClientSession() as session:
@@ -122,7 +111,5 @@ async def resolve_magnet_link(guid: str, link: str) -> str:
                 print(f"Updated link to {location}.")
                 return location
             else:
-                print(
-                    f"Didn't find redirect: {response.status}. Trying anyway but this may fail if Jackett is not public."
-                )
-                return link
+                print(f"Didn't find redirect: {response.status}. No magnet link could be found.")
+                return None

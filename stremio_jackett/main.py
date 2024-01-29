@@ -6,6 +6,7 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type:
 
 from stremio_jackett import human, jackett
 from stremio_jackett.debrid import rd
+from stremio_jackett.jackett_models import SearchQuery
 from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
 from stremio_jackett.torrent import Torrent
 
@@ -49,7 +50,7 @@ async def search(
         return StreamResponse(streams=[], error="Error getting media info")
     print(f"Found Media Info: {media_info.model_dump_json()}")
 
-    q = jackett.SearchQuery(
+    q = SearchQuery(
         name=media_info.name,
         type=type,
     )

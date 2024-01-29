@@ -4,6 +4,13 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class SearchQuery(BaseModel):
+    name: str
+    type: str
+    season: str | None = None
+    episode: str | None = None
+
+
 class SearchResult(BaseModel):
     FirstSeen: Optional[datetime]
     Tracker: Optional[str]
