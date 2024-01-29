@@ -62,7 +62,7 @@ async def search(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,
-        max_results=maxResults,
+        max_results=10,
         search_query=q,
     )
 
@@ -71,7 +71,7 @@ async def search(
     rd_links: list[rd.UnrestrictedLink] = await rd.get_stream_links(
         torrents=torrents,
         debrid_token=debridApiKey,
-        season_episode=id,
+        season_episode="E".join(id.split(":")[1:]),
         max_results=maxResults,
     )
 
