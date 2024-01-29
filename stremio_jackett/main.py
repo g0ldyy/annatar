@@ -66,6 +66,11 @@ async def search(
         search_query=q,
     )
 
+    # print(f"Found {len(torrents)} torrents for {type} {id}")
+    # for torrent in torrents:
+    #     print(f"Torrent: {torrent.model_dump_json(indent=2)}")
+    # return StreamResponse(streams=[], error="Error getting media info")
+
     # make get_movie_rd_links return a better struct with more info like
     # resolution (4K) and audio channels (5.1)
     rd_links: list[rd.UnrestrictedLink] = await rd.get_stream_links(

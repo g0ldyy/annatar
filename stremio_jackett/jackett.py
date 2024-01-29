@@ -1,13 +1,12 @@
-import asyncio
 import json
 import re
-import xml.etree.ElementTree as ET
 from typing import Any
 
 import aiohttp
 from diskcache import Cache  # type: ignore
 from pydantic import BaseModel
 
+from stremio_jackett.jackett_models import SearchResult
 from stremio_jackett.torrent import Torrent
 
 cache: Cache = Cache(__name__)
@@ -27,70 +26,76 @@ async def search(
     search_query: SearchQuery,
     max_results: int,
 ) -> list[Torrent]:
-    search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results/torznab/api"
+    search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
         f" S{search_query.season} E{search_query.episode}" if search_query.type == "series" else ""
     )
     params: dict[str, Any] = {
         "apikey": jackett_api_key,
-        "cat": category,
-        "q": f"{search_query.name}{suffix}",
+        "Category": category,
+        "Query": f"{search_query.name}{suffix}",
     }
 
+    torrents: list[Torrent] = []
     async with aiohttp.ClientSession() as session:
         print(f"Searching Jackett for {search_query.name} with params {json.dumps(params)}...")
-        async with session.get(search_url, params=params, timeout=60) as response:
-            response_body_raw = await response.read()
-            if response.status == 200 and response_body_raw:
-                return await parse_xml(response_body_raw.decode("utf-8"), limit=max_results)
-            else:
+        async with session.get(
+            search_url,
+            params=params,
+            timeout=60,
+            headers={"Accept": "application/json"},
+        ) as response:
+            if response.status != 200:
                 print(f"No results from Jackett status:{response.status}")
                 return []
-    return []
+            response_json = await response.json()
 
+    search_results: list[SearchResult] = [
+        SearchResult(**result) for result in response_json["Results"]
+    ]
+    for r in search_results:
+        if len(torrents) >= max_results:
+            return torrents
 
-async def parse_xml(xml: str, limit: int) -> list[Torrent]:
-    print(f"Parsing XML: \n{xml}")
-    root = ET.fromstring(xml)
-    channel = root.find("channel")
-    items = channel.findall("item") if channel is not None else []
+        if r.InfoHash and r.MagnetUri:
+            torrents.append(
+                Torrent(
+                    guid=r.Guid,
+                    info_hash=r.InfoHash,
+                    title=r.Title,
+                    size=r.Size,
+                    url=r.MagnetUri,
+                    seeders=r.Seeders,
+                )
+            )
+            continue
 
-    results: list[Torrent] = await asyncio.gather(
-        *[parse_xml_result(item) for item in items[:limit]]
-    )
-    return sorted(results, key=lambda x: (x.seeders or 0), reverse=True)
+        elif r.Link and r.Link.startswith("http"):
+            magnet_link: str = await resolve_magnet_link(guid=r.Guid, link=r.Link)
+            if not magnet_link:
+                print(f"Could not resolve magnet link for {r.Link}. Skipping")
+                continue
+
+            info_hash: str | None = r.InfoHash or magnet_to_info_hash(magnet_link)
+            if info_hash:
+                torrents.append(
+                    Torrent(
+                        guid=r.Guid,
+                        info_hash=info_hash,
+                        title=r.Title,
+                        size=r.Size,
+                        url=magnet_link,
+                        seeders=r.Seeders,
+                    )
+                )
+
+    return torrents
 
 
 def magnet_to_info_hash(magnet_link: str):
     match = re.search("btih:([a-zA-Z0-9]+)", magnet_link)
     return match.group(1) if match else None
-
-
-async def parse_xml_result(item: Any) -> Torrent:
-    torznab_attr = item.find("torznab:attr")
-    seeders = 0
-    if torznab_attr is not None:
-        seeders_attr = torznab_attr.find("./[@name='seeders']")
-        if seeders_attr is not None:
-            seeders = int(seeders_attr.get("value", "0"))
-
-    url: str = item.findtext("link", "")
-    guid: str = item.findtext("guid", "")
-
-    if not url.startswith("magnet"):
-        url = await resolve_magnet_link(guid=guid, link=url)
-
-    info_hash: str = item.findtext("infohash", magnet_to_info_hash(url))
-
-    return Torrent(
-        guid=guid,
-        info_hash=info_hash,
-        title=item.findtext("title", ""),
-        size=int(item.findtext("size", "0")),
-        url=url,
-        seeders=seeders,
-    )
 
 
 async def resolve_magnet_link(guid: str, link: str) -> str:
