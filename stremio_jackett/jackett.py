@@ -38,7 +38,7 @@ async def search(
         async with session.get(
             search_url,
             params=params,
-            timeout=60,
+            timeout=10,
             headers={"Accept": "application/json"},
         ) as response:
             if response.status != 200:
