@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI
@@ -41,6 +42,7 @@ async def search(
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
+    start: datetime = datetime.now()
     print(f"Received request for {type} {id}")
     imdb_id = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
@@ -105,6 +107,7 @@ async def search(
         for link in links
         if link
     ]
+    print(f"Found {len(streams)} streams for {type} {id} in {datetime.now() - start}")
     return StreamResponse(streams=streams)
 
 
