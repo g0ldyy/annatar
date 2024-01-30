@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import json
+import re
 from concurrent.futures import as_completed
 from functools import lru_cache
 from typing import Any, Optional
@@ -69,7 +70,15 @@ async def search(
         for future in futures:
             future.cancel()
 
-    return list(torrents.values())
+    unique_list: list[Torrent] = list(torrents.values())
+    pattern: str = search_query.name.replace(" ", r"\W")
+    # Prioritize items that match the name more precisely
+    prioritized_list: list[Torrent] = sorted(
+        unique_list,
+        key=lambda torrent: bool(re.search(pattern, torrent.title, re.IGNORECASE)),
+        reverse=True,
+    )
+    return prioritized_list
 
 
 async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:
