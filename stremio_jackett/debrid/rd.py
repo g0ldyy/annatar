@@ -7,6 +7,7 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
+from stremio_jackett import human
 from stremio_jackett.debrid.models import StreamLink
 from stremio_jackett.debrid.rd_models import (
     InstantFile,
@@ -22,29 +23,28 @@ ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
 async def select_biggest_file(
     files: list[TorrentFile],
-    season_episode: str | None,
+    season_episode: list[int],
 ) -> int:
     if len(files) == 0:
         print("No files, returning 0")
         return 0
+    sorted_files: list[TorrentFile] = sorted(files, key=lambda f: f.bytes, reverse=True)
     if len(files) == 1:
         print(f"Only one file, returning {files[0].id}")
         return files[0].id
 
-    sorted_files: list[TorrentFile] = sorted(files, key=lambda f: f.bytes, reverse=True)
     if not season_episode:
         print(f"No season_episode, returning {sorted_files[0].id}")
         return sorted_files[0].id
 
-    s_e = f"S{season_episode.replace(':', 'E')}".lower()
     for file in sorted_files:
-        print(f"Searching for {s_e} in {file}")
         path = file.path.lower()
-        if s_e in path:
+        if human.match_season_episode(season_episode=season_episode, file=path):
+            print(f"Found {human.pretty_season_episode(season_episode)} in {path}")
             return file.id
-        if s_e.replace("0", "") in path:
-            return file.id
-    print(f"No file found for {s_e}, returning {sorted_files[0].id}")
+    print(
+        f"""No file found for {human.pretty_season_episode(season_episode)}, returning first item."""
+    )
     return 0
 
 
@@ -137,7 +137,7 @@ async def get_torrent_info(
 async def select_torrent_file(
     torrent_id: str,
     debrid_token: str,
-    season_episode: Optional[str] = None,
+    season_episode: list[int] = [],
 ):
     torrent_info: TorrentInfo | None = await get_torrent_info(
         torrent_id=torrent_id,
@@ -186,8 +186,8 @@ async def unrestrict_link(
 
 async def get_stream_link(
     torrent: Torrent,
-    season_episode: str,
     debrid_token: str,
+    season_episode: list[int] = [],
 ) -> StreamLink | None:
     cached_files: list[InstantFile] = await get_instant_availability(
         torrent.info_hash, debrid_token
@@ -246,7 +246,7 @@ async def delete_torrent(torrent_id: str, debrid_token: str):
 async def get_stream_links(
     torrents: list[Torrent],
     debrid_token: str,
-    season_episode: str,
+    season_episode: list[int] = [],
     max_results: int = 5,
 ) -> list[StreamLink]:
     """

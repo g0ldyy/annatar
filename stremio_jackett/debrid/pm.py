@@ -8,6 +8,7 @@ from typing import Generic, Optional, Tuple, Type, TypeVar
 import aiohttp
 from pydantic import BaseModel
 
+from stremio_jackett import human
 from stremio_jackett.debrid import magnet
 from stremio_jackett.debrid.models import StreamLink
 from stremio_jackett.debrid.pm_models import DirectDL, DirectDLResponse
@@ -53,14 +54,9 @@ async def select_stream_file(
         f: DirectDL = sorted_files[0]
         return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
 
-    pattern = r"S0?{s}\s?E0?{e}".format(
-        s=season_episode[0],
-        e=season_episode[1],
-    )
     for file in sorted_files:
         path = file.path.split("/")[-1].lower()
-        print(f"Searching for {pattern} in {path}")
-        if re.findall(pattern, path, re.IGNORECASE):
+        if human.match_season_episode(season_episode=season_episode, file=path):
             print(f"Found {season_episode} in {path}")
             return StreamLink(name=file.path.split("/")[-1], size=file.size, url=file.link)
     print(f"No file found for {season_episode}")

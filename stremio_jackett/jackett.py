@@ -1,6 +1,9 @@
+import asyncio
+import concurrent.futures
 import json
+from concurrent.futures import as_completed
 from functools import lru_cache
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 
@@ -30,7 +33,6 @@ async def search(
         "Query": f"{search_query.name}{suffix}",
     }
 
-    torrents: list[Torrent] = []
     async with aiohttp.ClientSession() as session:
         print(f"Searching Jackett for {search_query.name} with params {json.dumps(params)}...")
         async with session.get(
@@ -47,47 +49,65 @@ async def search(
     search_results: list[SearchResult] = [
         SearchResult(**result) for result in response_json["Results"]
     ]
-    for r in search_results:
-        if len(torrents) >= max_results:
-            return torrents
 
-        if imdb and r.Imdb and r.Imdb != imdb:
-            print(f"Skipping mismatched IMDB {r.Imdb} for {r.Title}. Expected {imdb}")
-            continue
-        if r.InfoHash and r.MagnetUri:
-            torrents.append(
-                Torrent(
-                    guid=r.Guid,
-                    info_hash=r.InfoHash,
-                    title=r.Title,
-                    size=r.Size,
-                    url=r.MagnetUri,
-                    seeders=r.Seeders,
-                )
-            )
-            continue
+    # sync map search results to torrents async
+    def __run(result: SearchResult) -> Optional[Torrent]:
+        return asyncio.run(map_matched_result(result=result, imdb=imdb))
 
-        elif r.Link and r.Link.startswith("http"):
-            magnet_link: str | None = await resolve_magnet_link(guid=r.Guid, link=r.Link)
-            if not magnet_link:
-                print(f"Could not resolve magnet link for {r.Link}. Skipping")
-                continue
+    torrents: dict[str, Torrent] = {}
 
-            info_hash: str | None = r.InfoHash or magnet.get_info_hash(magnet_link)
-            if info_hash:
-                torrents.append(
-                    Torrent(
-                        guid=r.Guid,
-                        info_hash=info_hash,
-                        title=r.Title,
-                        size=r.Size,
-                        url=magnet_link,
-                        seeders=r.Seeders,
-                    )
-                )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(__run, result) for result in search_results]
 
-    # need to make this a unique list by t.URL
-    return torrents
+        for future in as_completed(futures):
+            torrent: Torrent | None = future.result()
+            if torrent:
+                torrents[torrent.info_hash] = torrent
+                if len(torrents.keys()) >= max_results:
+                    break
+        # cancel the remaining futures
+        for future in futures:
+            future.cancel()
+
+    return list(torrents.values())
+
+
+async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:
+    if imdb and result.Imdb and result.Imdb != imdb:
+        print(f"Skipping mismatched IMDB {result.Imdb} for {result.Title}. Expected {imdb}")
+        return None
+
+    if result.InfoHash and result.MagnetUri:
+        return Torrent(
+            guid=result.Guid,
+            info_hash=result.InfoHash,
+            title=result.Title,
+            size=result.Size,
+            url=result.MagnetUri,
+            seeders=result.Seeders,
+        )
+
+    if result.Link and result.Link.startswith("http"):
+        magnet_link: str | None = await resolve_magnet_link(guid=result.Guid, link=result.Link)
+        if not magnet_link:
+            print(f"Could not resolve magnet link for {result.Link}. Skipping")
+            return None
+
+        info_hash: str | None = result.InfoHash or magnet.get_info_hash(magnet_link)
+        if not info_hash:
+            print(f"Could not find info hash for {magnet_link}. Skipping")
+            return None
+
+        return Torrent(
+            guid=result.Guid,
+            info_hash=info_hash,
+            title=result.Title,
+            size=result.Size,
+            url=magnet_link,
+            seeders=result.Seeders,
+        )
+
+    return None
 
 
 @lru_cache(maxsize=1024, typed=True)
@@ -103,7 +123,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
 
     print(f"Following redirect for {link}")
     async with aiohttp.ClientSession() as session:
-        async with session.get(link, allow_redirects=False) as response:
+        async with session.get(link, allow_redirects=False, timeout=5) as response:
             if response.status == 302:
                 location = response.headers.get("Location", "")
                 print(f"Updated link to {location}.")
