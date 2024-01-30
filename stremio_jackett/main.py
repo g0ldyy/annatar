@@ -3,11 +3,10 @@ from typing import Any
 
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
-from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type: ignore
 
 from stremio_jackett import human, jackett
-from stremio_jackett.debrid import pm
 from stremio_jackett.debrid.models import StreamLink
+from stremio_jackett.debrid.providers import DebridService, get_provider
 from stremio_jackett.jackett_models import SearchQuery
 from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
 from stremio_jackett.torrent import Torrent
@@ -72,21 +71,9 @@ async def search(
         imdb=int(imdb_id.replace("tt", "")),
     )
 
-    # print(f"Found {len(torrents)} torrents for {type} {id}")
-    # for torrent in torrents:
-    #     print(f"Torrent: {torrent.model_dump_json(indent=2)}")
-    # return StreamResponse(streams=[], error="Error getting media info")
+    debrid_service: DebridService = get_provider(streamService)
 
-    # make get_movie_rd_links return a better struct with more info like
-    # resolution (4K) and audio channels (5.1)
-    # links: list[StreamLink] = await rd.get_stream_links(
-    #     torrents=torrents,
-    #     debrid_token=debridApiKey,
-    #     season_episode=season_episode,
-    #     max_results=maxResults,
-    # )
-
-    links: list[StreamLink] = await pm.get_stream_links(
+    links: list[StreamLink] = await debrid_service.get_stream_links(
         torrents=torrents,
         debrid_token=debridApiKey,
         season_episode=season_episode,
@@ -113,7 +100,6 @@ async def search(
 
 if __name__ == "__main__":
     FastAPIInstrumentor.instrument_app(app)  # type: ignore
-    RequestsInstrumentor().instrument()  # type: ignore
 
     import uvicorn
 
