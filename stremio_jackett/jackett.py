@@ -20,7 +20,9 @@ async def search(
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
-        f" S{search_query.season} E{search_query.episode}" if search_query.type == "series" else ""
+        f" S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
+        if search_query.type == "series"
+        else ""
     )
     params: dict[str, Any] = {
         "apikey": jackett_api_key,
@@ -84,6 +86,7 @@ async def search(
                     )
                 )
 
+    # need to make this a unique list by t.URL
     return torrents
 
 

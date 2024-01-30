@@ -53,11 +53,14 @@ async def select_stream_file(
         f: DirectDL = sorted_files[0]
         return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
 
-    pattern = r"S0*{s}\s*E0*{e}".format(s=season_episode[0], e=season_episode[1])
+    pattern = r"S0?{s}\s?E0?{e}".format(
+        s=season_episode[0],
+        e=season_episode[1],
+    )
     for file in sorted_files:
         path = file.path.split("/")[-1].lower()
-        print(f"Searching for {season_episode} in {path}")
-        if re.match(pattern, path):
+        print(f"Searching for {pattern} in {path}")
+        if re.findall(pattern, path, re.IGNORECASE):
             print(f"Found {season_episode} in {path}")
             return StreamLink(name=file.path.split("/")[-1], size=file.size, url=file.link)
     print(f"No file found for {season_episode}")
