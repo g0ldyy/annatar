@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 import json
 import re
+from concurrent.futures import as_completed
 from os import getenv
 from typing import Generic, Optional, Tuple, Type, TypeVar
 
@@ -115,4 +116,18 @@ async def get_stream_links(
     with concurrent.futures.ThreadPoolExecutor() as executor:
         results = list(executor.map(__run, torrents))
 
-    return [r for r in results if r]
+    links: dict[str, StreamLink] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(__run, torrent) for torrent in torrents]
+
+        for future in as_completed(futures):
+            link: StreamLink | None = future.result()
+            if link:
+                links[link.url] = link
+                if len(links.keys()) >= max_results:
+                    break
+        # cancel the remaining futures
+        for future in futures:
+            future.cancel()
+
+    return list(links.values())[:max_results]
