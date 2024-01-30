@@ -7,8 +7,9 @@ from pydantic import BaseModel
 class SearchQuery(BaseModel):
     name: str
     type: str
-    season: str | None = None
-    episode: str | None = None
+    year: Optional[str] = None
+    season: Optional[str] = None
+    episode: Optional[str] = None
 
 
 class SearchResult(BaseModel):

@@ -12,6 +12,8 @@ from stremio_jackett.debrid import magnet
 from stremio_jackett.jackett_models import SearchQuery, SearchResult
 from stremio_jackett.torrent import Torrent
 
+PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
+
 
 async def search(
     debrid_api_key: str,
@@ -24,14 +26,14 @@ async def search(
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
-        f" S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
+        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
         if search_query.type == "series"
-        else ""
+        else search_query.year or ""
     )
     params: dict[str, Any] = {
         "apikey": jackett_api_key,
         "Category": category,
-        "Query": f"{search_query.name}{suffix}",
+        "Query": f"{search_query.name} {suffix}".strip(),
     }
 
     async with aiohttp.ClientSession() as session:
@@ -70,14 +72,12 @@ async def search(
         for future in futures:
             future.cancel()
 
-    unique_list: list[Torrent] = list(torrents.values())
-    pattern: str = search_query.name.replace(" ", r"\W")
-    # Prioritize items that match the name more precisely
+    # prioritize items by quality
     prioritized_list: list[Torrent] = sorted(
-        unique_list,
-        key=lambda torrent: bool(re.search(pattern, torrent.title, re.IGNORECASE)),
-        reverse=True,
+        list(torrents.values()),
+        key=lambda t: sort_priority(search_query.name, t),
     )
+
     return prioritized_list
 
 
@@ -117,6 +117,24 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
         )
 
     return None
+
+
+# sort items by quality
+def sort_priority(search_query: str, item: Torrent) -> int:
+    name_pattern: str = search_query.replace(" ", r"\W")
+
+    priority: int = 50
+    reason: str = "no priority matches"
+    for index, quality in enumerate(PRIORITY_WORDS):
+        if re.search(quality, item.title):
+            if re.search(name_pattern, item.title, re.IGNORECASE):
+                priority = index
+                reason = f"matched {quality} and name"
+            else:
+                priority = index + 10
+                reason = f"matched {quality}, mismatch name"
+    print(f"torrent:{item.title} priority: {priority}. reason:{reason}")
+    return priority
 
 
 @lru_cache(maxsize=1024, typed=True)

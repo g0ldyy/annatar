@@ -61,6 +61,8 @@ async def search(
     if type == "series":
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
+    if type == "movie":
+        q.year = media_info.releaseInfo
 
     torrents: list[Torrent] = await jackett.search(
         debrid_api_key=debridApiKey,
