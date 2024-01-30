@@ -29,7 +29,7 @@ class MediaInfo(BaseModel):
     logo: Optional[str] = None
     description: Optional[str] = None
     # A.k.a. year, e.g. "2000" for movies and "2000-2014" or "2000-" for TV shows
-    releaseInfo: Optional[str] = None
+    releaseInfo: Optional[str] = ""
     imdbRating: Optional[str] = None
     # ISO 8601, e.g. "2010-12-06T05:00:00.000Z"
     released: Optional[str] = None

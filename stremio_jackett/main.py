@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Any
 
@@ -56,13 +57,12 @@ async def search(
     q = SearchQuery(
         name=media_info.name,
         type=type,
+        year=re.split(r"\D", (media_info.releaseInfo or ""))[0],
     )
 
     if type == "series":
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
-    if type == "movie":
-        q.year = media_info.releaseInfo
 
     torrents: list[Torrent] = await jackett.search(
         debrid_api_key=debridApiKey,

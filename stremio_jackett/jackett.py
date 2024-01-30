@@ -37,7 +37,9 @@ async def search(
     }
 
     async with aiohttp.ClientSession() as session:
-        print(f"Searching Jackett for {search_query.name} with params {json.dumps(params)}...")
+        print(
+            f"Searching Jackett for {search_query.model_dump()} with params {json.dumps(params)}..."
+        )
         async with session.get(
             search_url,
             params=params,
@@ -49,9 +51,11 @@ async def search(
                 return []
             response_json = await response.json()
 
-    search_results: list[SearchResult] = [
-        SearchResult(**result) for result in response_json["Results"]
-    ]
+    search_results: list[SearchResult] = sorted(
+        [SearchResult(**result) for result in response_json["Results"]],
+        key=lambda r: r.Seeders,
+        reverse=True,
+    )
 
     # sync map search results to torrents async
     def __run(result: SearchResult) -> Optional[Torrent]:
@@ -121,12 +125,13 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
 
 # sort items by quality
 def sort_priority(search_query: str, item: Torrent) -> int:
-    name_pattern: str = search_query.replace(" ", r"\W")
+    name_pattern: str = re.sub(r"\W+", r"\\W+", search_query)
+    print(f"search_query:{search_query} name_pattern:{name_pattern}")
 
     priority: int = 50
     reason: str = "no priority matches"
     for index, quality in enumerate(PRIORITY_WORDS):
-        if re.search(quality, item.title):
+        if re.search(quality, item.title, re.IGNORECASE):
             if re.search(name_pattern, item.title, re.IGNORECASE):
                 priority = index
                 reason = f"matched {quality} and name"
