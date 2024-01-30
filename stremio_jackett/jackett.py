@@ -1,10 +1,10 @@
 import json
-import re
 from functools import lru_cache
 from typing import Any
 
 import aiohttp
 
+from stremio_jackett.debrid import magnet
 from stremio_jackett.jackett_models import SearchQuery, SearchResult
 from stremio_jackett.torrent import Torrent
 
@@ -71,7 +71,7 @@ async def search(
                 print(f"Could not resolve magnet link for {r.Link}. Skipping")
                 continue
 
-            info_hash: str | None = r.InfoHash or magnet_to_info_hash(magnet_link)
+            info_hash: str | None = r.InfoHash or magnet.get_info_hash(magnet_link)
             if info_hash:
                 torrents.append(
                     Torrent(
@@ -85,11 +85,6 @@ async def search(
                 )
 
     return torrents
-
-
-def magnet_to_info_hash(magnet_link: str):
-    match = re.search("btih:([a-zA-Z0-9]+)", magnet_link)
-    return match.group(1) if match else None
 
 
 @lru_cache(maxsize=1024, typed=True)

@@ -5,7 +5,8 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: i
 from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type: ignore
 
 from stremio_jackett import human, jackett
-from stremio_jackett.debrid import rd
+from stremio_jackett.debrid import pm
+from stremio_jackett.debrid.models import StreamLink
 from stremio_jackett.jackett_models import SearchQuery
 from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
 from stremio_jackett.torrent import Torrent
@@ -42,6 +43,7 @@ async def search(
 ) -> StreamResponse:
     print(f"Received request for {type} {id}")
     imdb_id = id.split(":")[0]
+    season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
     print(f"Searching for {type} {id}")
 
     media_info = await get_media_info(id=imdb_id, type=type)
@@ -56,8 +58,8 @@ async def search(
     )
 
     if type == "series":
-        q.season = id.split(":")[1]
-        q.episode = id.split(":")[2]
+        q.season = str(season_episode[0])
+        q.episode = str(season_episode[1])
 
     torrents: list[Torrent] = await jackett.search(
         debrid_api_key=debridApiKey,
@@ -75,28 +77,32 @@ async def search(
 
     # make get_movie_rd_links return a better struct with more info like
     # resolution (4K) and audio channels (5.1)
-    rd_links: list[rd.UnrestrictedLink] = await rd.get_stream_links(
+    # links: list[StreamLink] = await rd.get_stream_links(
+    #     torrents=torrents,
+    #     debrid_token=debridApiKey,
+    #     season_episode="E".join(id.split(":")[1:]),
+    #     max_results=maxResults,
+    # )
+
+    links: list[StreamLink] = await pm.get_stream_links(
         torrents=torrents,
         debrid_token=debridApiKey,
-        season_episode="E".join(id.split(":")[1:]),
+        season_episode=season_episode,
         max_results=maxResults,
     )
-
-    # sort by size
-    # rd_links.sort(key=lambda link: link.filesize, reverse=True)
 
     streams: list[Stream] = [
         Stream(
             title=media_info.name,
-            url=link.download,
+            url=link.url,
             name="\n".join(
                 [
-                    link.filename,
-                    f"💾{human.bytes(float(link.filesize))}",
+                    link.name,
+                    f"💾{human.bytes(float(link.size))}",
                 ]
             ),
         )
-        for link in rd_links
+        for link in links
         if link
     ]
     return StreamResponse(streams=streams)

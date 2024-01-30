@@ -7,6 +7,7 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
+from stremio_jackett.debrid.models import StreamLink
 from stremio_jackett.debrid.rd_models import (
     InstantFile,
     StreamableFile,
@@ -187,7 +188,7 @@ async def get_stream_link(
     torrent: Torrent,
     season_episode: str,
     debrid_token: str,
-) -> UnrestrictedLink | None:
+) -> StreamLink | None:
     cached_files: list[InstantFile] = await get_instant_availability(
         torrent.info_hash, debrid_token
     )
@@ -227,25 +228,11 @@ async def get_stream_link(
     if not unrestricted_link:
         print(f"torrent:{torrent.info_hash}: Could not get unrestrict link")
         return None
-    return unrestricted_link
-
-    # torrent_info: TorrentInfo | None = await get_torrent_info(
-    #     torrent_id=torrent_id, season_episode=season_episode, debrid_token=debrid_token
-    # )
-
-    # if not torrent_info:
-    #     print(f"torrent:{torrent_id}: No torrent info found.")
-    #     return None
-
-    # if len(torrent_info.links) >= 1:
-    #     print(f"torrent:{torrent_id}: RD link found.")
-    # else:
-    #     print(f"torrent:{torrent_id}: No RD link found. Torrent is not cached. Skipping")
-    #     await delete_torrent(torrent_id=torrent_id, debrid_token=debrid_token)
-    #     return None
-
-    # download_link = torrent_info.links[0]
-    # return await unrestrict_link(torrent, download_link, debrid_token)
+    return StreamLink(
+        size=unrestricted_link.filesize,
+        name=unrestricted_link.filename,
+        url=unrestricted_link.download,
+    )
 
 
 async def delete_torrent(torrent_id: str, debrid_token: str):
@@ -261,12 +248,12 @@ async def get_stream_links(
     debrid_token: str,
     season_episode: str,
     max_results: int = 5,
-) -> list[UnrestrictedLink]:
+) -> list[StreamLink]:
     """
     Generates a list of RD links for each torrent link.
     """
 
-    def __run(torrent: Torrent) -> Optional[UnrestrictedLink]:
+    def __run(torrent: Torrent) -> Optional[StreamLink]:
         return asyncio.run(
             get_stream_link(
                 torrent=torrent,
