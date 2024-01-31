@@ -15,16 +15,12 @@ if [ "${provider}" == "real-debrid" ]; then
 	http --timeout 60 \
 		":8000/stream/${kind}/${term}.json" \
 		streamService==real-debrid \
-		jackettUrl==https://jackett.blockloop.io \
-		jackettApiKey==$(op read "op://Personal/Jackett/API KEY") \
 		debridApiKey==$(op read "op://Personal/Real-debrid/API Token") \
 		maxResults==${max_results}
 elif [ "${provider}" == "premiumize" ]; then
 	http --timeout 60 \
 		":8000/stream/${kind}/${term}.json" \
 		streamService==premiumize \
-		jackettUrl==https://jackett.blockloop.io \
-		jackettApiKey==$(op read "op://Personal/Jackett/API KEY") \
 		debridApiKey==$(op read "op://Personal/Premiumize/API Key") \
 		maxResults==${max_results}
 else

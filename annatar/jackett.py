@@ -12,7 +12,7 @@ from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
-PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
+
 # TODO: need to gather these from jackett on startup or take this as an env var
 # and then verify on startup. Jackett will accept incorrect values though and
 # just return no results
@@ -26,12 +26,11 @@ ALL_INDEXERS: list[str] = [
 ]
 
 
-@timestamped(["indexer", "imdb", "jackett_url"])
+@timestamped(["indexer", "imdb"])
 async def search_indexer(
-    debrid_api_key: str,
+    search_query: SearchQuery,
     jackett_url: str,
     jackett_api_key: str,
-    search_query: SearchQuery,
     max_results: int,
     indexer: str,
     imdb: int | None = None,
@@ -118,12 +117,11 @@ async def search_indexer(
     return prioritized_list
 
 
-@timestamped(["imdb", "jackett_url"])
+@timestamped(["imdb"])
 async def search_indexers(
-    debrid_api_key: str,
+    search_query: SearchQuery,
     jackett_url: str,
     jackett_api_key: str,
-    search_query: SearchQuery,
     max_results: int,
     imdb: int | None = None,
     timeout: int = 60,
@@ -134,11 +132,10 @@ async def search_indexers(
     tasks = [
         asyncio.create_task(
             search_indexer(
-                debrid_api_key=debrid_api_key,
-                jackett_url=jackett_url,
-                jackett_api_key=jackett_api_key,
                 search_query=search_query,
                 max_results=max_results,
+                jackett_url=jackett_url,
+                jackett_api_key=jackett_api_key,
                 imdb=imdb,
                 timeout=timeout / 5,
                 indexer=indexer,

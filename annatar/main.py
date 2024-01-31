@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 from contextvars import ContextVar
@@ -21,6 +22,9 @@ app = FastAPI()
 request_id = ContextVar("request_id", default="unknown")
 
 log = structlog.get_logger(__name__)
+
+jackett_url: str = os.environ.get("JACKETT_URL", "http://localhost:9117")
+jackett_api_key: str = os.environ.get("JACKETT_API_KEY", "")
 
 
 @app.middleware("http")
@@ -73,8 +77,6 @@ async def search(
     type: str,
     id: str,
     streamService: str,
-    jackettUrl: str,
-    jackettApiKey: str,
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
@@ -106,10 +108,9 @@ async def search(
         q.episode = str(season_episode[1])
 
     torrents: list[Torrent] = await jackett.search_indexers(
-        debrid_api_key=debridApiKey,
-        jackett_url=jackettUrl,
-        jackett_api_key=jackettApiKey,
         max_results=max(10, maxResults),
+        jackett_url=jackett_url,
+        jackett_api_key=jackett_api_key,
         search_query=q,
         imdb=int(imdb_id.replace("tt", "")),
         timeout=60,
