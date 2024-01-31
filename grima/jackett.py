@@ -1,17 +1,19 @@
 import asyncio
 import concurrent.futures
-import json
 import re
 from concurrent.futures import as_completed
+from datetime import datetime
 from functools import lru_cache
 from typing import Any, Optional
 
 import aiohttp
+import structlog
 
 from grima.debrid import magnet
 from grima.jackett_models import SearchQuery, SearchResult
 from grima.torrent import Torrent
 
+log = structlog.get_logger(__name__)
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
 
 
@@ -22,6 +24,7 @@ async def search(
     search_query: SearchQuery,
     max_results: int,
     imdb: int | None = None,
+    timeout: int = 60,
 ) -> list[Torrent]:
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
@@ -37,18 +40,21 @@ async def search(
     }
 
     async with aiohttp.ClientSession() as session:
-        print(
-            f"Searching Jackett for {search_query.model_dump()} with params {json.dumps(params)}..."
-        )
+        log.info("searching jackett", query=search_query.model_dump(), params=params)
+        start: datetime = datetime.now()
         async with session.get(
             search_url,
             params=params,
-            timeout=10,
+            timeout=timeout,
             headers={"Accept": "application/json"},
         ) as response:
             if response.status != 200:
                 print(f"No results from Jackett status:{response.status}")
                 return []
+            log.info(
+                "jacket search completed",
+                duration=f"{(datetime.now() - start).total_seconds()}s",
+            )
             response_json = await response.json()
 
     search_results: list[SearchResult] = sorted(
