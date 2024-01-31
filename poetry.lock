@@ -260,17 +260,6 @@ wrapt = ">=1.10,<2"
 dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "sphinx (<2)", "tox"]
 
 [[package]]
-name = "diskcache"
-version = "5.6.3"
-description = "Disk Cache -- Disk and file backed persistent cache."
-optional = false
-python-versions = ">=3"
-files = [
-    {file = "diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19"},
-    {file = "diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc"},
-]
-
-[[package]]
 name = "fastapi"
 version = "0.109.0"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -288,16 +277,6 @@ typing-extensions = ">=4.8.0"
 
 [package.extras]
 all = ["email-validator (>=2.0.0)", "httpx (>=0.23.0)", "itsdangerous (>=1.1.0)", "jinja2 (>=2.11.2)", "orjson (>=3.2.1)", "pydantic-extra-types (>=2.0.0)", "pydantic-settings (>=2.0.0)", "python-multipart (>=0.0.5)", "pyyaml (>=5.3.1)", "ujson (>=4.0.1,!=4.0.2,!=4.1.0,!=4.2.0,!=4.3.0,!=5.0.0,!=5.1.0)", "uvicorn[standard] (>=0.12.0)"]
-
-[[package]]
-name = "flatbencode"
-version = "0.2.1"
-description = "Fast, safe and non-recursive implementation of Bittorrent bencoding for Python 3"
-optional = false
-python-versions = "*"
-files = [
-    {file = "flatbencode-0.2.1.tar.gz", hash = "sha256:77397d5d0108835404f6f7cad640d403c7025a11812afc7e1df4b0f92589ba77"},
-]
 
 [[package]]
 name = "frozenlist"
@@ -957,40 +936,6 @@ anyio = ">=3.4.0,<5"
 full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart", "pyyaml"]
 
 [[package]]
-name = "structlog"
-version = "24.1.0"
-description = "Structured Logging for Python"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "structlog-24.1.0-py3-none-any.whl", hash = "sha256:3f6efe7d25fab6e86f277713c218044669906537bb717c1807a09d46bca0714d"},
-    {file = "structlog-24.1.0.tar.gz", hash = "sha256:41a09886e4d55df25bdcb9b5c9674bccfab723ff43e0a86a1b7b236be8e57b16"},
-]
-
-[package.extras]
-dev = ["structlog[tests,typing]"]
-docs = ["furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-mermaid", "sphinxext-opengraph", "twisted"]
-tests = ["freezegun (>=0.2.8)", "pretend", "pytest (>=6.0)", "pytest-asyncio (>=0.17)", "simplejson"]
-typing = ["mypy (>=1.4)", "rich", "twisted"]
-
-[[package]]
-name = "torf"
-version = "4.2.4"
-description = "Python 3 module for creating and parsing torrent files and magnet URIs"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "torf-4.2.4-py3-none-any.whl", hash = "sha256:e84ec73cd81cb2d56e36b9f4604806f16ee0c70aeafadfe2f31ca3266ca03a87"},
-    {file = "torf-4.2.4.tar.gz", hash = "sha256:f846ef58b6b00bc3b6a5c25bf225c59149ee871738d87a20a8953f620b77671c"},
-]
-
-[package.dependencies]
-flatbencode = "==0.2.*"
-
-[package.extras]
-dev = ["coverage", "flake8", "isort", "pytest", "pytest-cov", "pytest-httpserver", "pytest-mock", "pytest-xdist", "ruff", "tox"]
-
-[[package]]
 name = "typing-extensions"
 version = "4.9.0"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1219,4 +1164,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "fad583956f66fb2a68988f6aeaa3426fc3324b6bb1bbb9a1139250cc3773307e"
+content-hash = "16a1e06bddd1305b3a7f2e19f95b3e25f93307c2179ac8bc860f8d6d2fe2900c"
