@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "stremio-jackett-py"
+name = "grima"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
@@ -36,5 +36,5 @@ profile = "black"
 line-length = 100
 
 [tool.pyright]
-strict = ["stremio_jackett/*.py"]
+strict = ["grima/*.py"]
 remove_redundant_aliases = true

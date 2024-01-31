@@ -8,9 +8,9 @@ from typing import Any, Optional
 
 import aiohttp
 
-from stremio_jackett.debrid import magnet
-from stremio_jackett.jackett_models import SearchQuery, SearchResult
-from stremio_jackett.torrent import Torrent
+from grima.debrid import magnet
+from grima.jackett_models import SearchQuery, SearchResult
+from grima.torrent import Torrent
 
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
 

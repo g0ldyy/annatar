@@ -7,16 +7,16 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
-from stremio_jackett import human
-from stremio_jackett.debrid.models import StreamLink
-from stremio_jackett.debrid.rd_models import (
+from grima import human
+from grima.debrid.models import StreamLink
+from grima.debrid.rd_models import (
     InstantFile,
     StreamableFile,
     TorrentFile,
     TorrentInfo,
     UnrestrictedLink,
 )
-from stremio_jackett.torrent import Torrent
+from grima.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 

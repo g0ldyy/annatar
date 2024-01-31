@@ -9,11 +9,11 @@ from typing import Generic, Optional, Tuple, Type, TypeVar
 import aiohttp
 from pydantic import BaseModel
 
-from stremio_jackett import human
-from stremio_jackett.debrid import magnet
-from stremio_jackett.debrid.models import StreamLink
-from stremio_jackett.debrid.pm_models import DirectDL, DirectDLResponse
-from stremio_jackett.torrent import Torrent
+from grima import human
+from grima.debrid import magnet
+from grima.debrid.models import StreamLink
+from grima.debrid.pm_models import DirectDL, DirectDLResponse
+from grima.torrent import Torrent
 
 ROOT_URL = "https://www.premiumize.me/api"
 

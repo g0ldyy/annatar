@@ -45,7 +45,9 @@ async def get_media_info(id: str, type: str) -> MediaInfo | None:
         api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
         async with session.get(api_url) as response:
             if response.status not in range(200, 300):
-                print(f"Error getting media info: {response.status}")
+                print(
+                    f"Error retrieving MediaInfo from strem.io: status={response.status} reason={response.reason}"
+                )
                 return None
             response_json = await response.json()
             meta = response_json["meta"]

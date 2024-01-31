@@ -2,15 +2,15 @@ import re
 from datetime import datetime
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
 
-from stremio_jackett import human, jackett
-from stremio_jackett.debrid.models import StreamLink
-from stremio_jackett.debrid.providers import DebridService, get_provider
-from stremio_jackett.jackett_models import SearchQuery
-from stremio_jackett.stremio import Stream, StreamResponse, get_media_info
-from stremio_jackett.torrent import Torrent
+from grima import human, jackett
+from grima.debrid.models import StreamLink
+from grima.debrid.providers import DebridService, get_provider
+from grima.jackett_models import SearchQuery
+from grima.stremio import Stream, StreamResponse, get_media_info
+from grima.torrent import Torrent
 
 app = FastAPI()
 
@@ -18,14 +18,14 @@ app = FastAPI()
 @app.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
     return {
-        "id": "community.blockloop.jackettpy",
+        "id": "community.blockloop.grima",
         "icon": "https://i.imgur.com/wEYQYN8.png",
         "version": "0.1.0",
         "catalogs": [],
         "resources": ["stream"],
         "types": ["movie", "series"],
-        "name": "JackettPy",
-        "description": "Stremio Jackett Addon",
+        "name": "Grima",
+        "description": "Stremio Grima Addon",
         "behaviorHints": {
             "configurable": "true",
         },
@@ -42,6 +42,13 @@ async def search(
     debridApiKey: str,
     maxResults: int = 5,
 ) -> StreamResponse:
+    if type not in ["movie", "series"]:
+        raise HTTPException(
+            status_code=400, detail="Invalid type. Valid types are movie and series"
+        )
+    if not id.startswith("tt"):
+        raise HTTPException(status_code=400, detail="Invalid id. Id must be an IMDB id with tt")
+
     start: datetime = datetime.now()
     print(f"Received request for {type} {id}")
     imdb_id = id.split(":")[0]

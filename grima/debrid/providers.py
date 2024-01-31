@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from stremio_jackett.debrid import pm, rd
-from stremio_jackett.debrid.models import StreamLink
-from stremio_jackett.torrent import Torrent
+from grima.debrid import pm, rd
+from grima.debrid.models import StreamLink
+from grima.torrent import Torrent
 
 
 class DebridService(ABC):
