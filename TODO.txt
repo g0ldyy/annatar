@@ -1,0 +1,4 @@
+- move jackett token and url to env vars instead of configuring
+- select indexers based on jackett http query during configuration
+  - make a request to '/api/v2.0/indexers' and look for any item listed as 'configured'
+- 

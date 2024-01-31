@@ -13,6 +13,7 @@ from annatar import human
 from annatar.debrid import magnet
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
+from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
@@ -45,6 +46,7 @@ async def make_request(
             return model.model_validate(raw), response
 
 
+@timestamped
 async def select_stream_file(
     files: list[DirectDL],
     season_episode: list[int],
@@ -66,6 +68,7 @@ async def select_stream_file(
     return None
 
 
+@timestamped
 async def get_stream_link(
     magnet_link: str,
     debrid_token: str,
@@ -96,6 +99,7 @@ async def get_stream_link(
     return await select_stream_file(dl.content, season_episode)
 
 
+@timestamped
 async def get_stream_links(
     torrents: list[Torrent],
     debrid_token: str,

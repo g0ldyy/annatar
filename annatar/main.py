@@ -105,7 +105,7 @@ async def search(
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
 
-    torrents: list[Torrent] = await jackett.search(
+    torrents: list[Torrent] = await jackett.search_indexers(
         debrid_api_key=debridApiKey,
         jackett_url=jackettUrl,
         jackett_api_key=jackettApiKey,

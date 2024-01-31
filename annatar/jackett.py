@@ -1,6 +1,5 @@
 import asyncio
 import re
-from datetime import datetime
 from functools import lru_cache
 from typing import Any, Optional
 
@@ -10,18 +9,32 @@ from structlog.contextvars import bound_contextvars
 
 from annatar.debrid import magnet
 from annatar.jackett_models import SearchQuery, SearchResult
+from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
+# TODO: need to gather these from jackett on startup or take this as an env var
+# and then verify on startup. Jackett will accept incorrect values though and
+# just return no results
+ALL_INDEXERS: list[str] = [
+    "yts",
+    "eztv",
+    "kickasstorrents-ws",
+    "thepiratebay",
+    "therarbg",
+    "torrentgalaxy",
+]
 
 
-async def search(
+@timestamped
+async def search_indexer(
     debrid_api_key: str,
     jackett_url: str,
     jackett_api_key: str,
     search_query: SearchQuery,
     max_results: int,
+    indexer: str,
     imdb: int | None = None,
     timeout: int = 60,
 ) -> list[Torrent]:
@@ -37,29 +50,42 @@ async def search(
         "Category": category,
         "Query": f"{search_query.name} {suffix}".strip(),
     }
+    params["Tracker[]"] = indexer
 
     async with aiohttp.ClientSession() as session:
-        log.info("searching jackett", query=search_query.model_dump(), params=params)
-        start: datetime = datetime.now()
-        async with session.get(
-            search_url,
+        log.info(
+            "searching jackett",
+            query=search_query.model_dump(),
             params=params,
-            timeout=timeout,
-            headers={"Accept": "application/json"},
-        ) as response:
-            if response.status != 200:
-                log.info(
-                    "jacket search failed",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return []
-            response_json = await response.json()
-            log.info(
-                "jacket search completed",
-                duration=f"{(datetime.now() - start).total_seconds()}s",
+            indexer=indexer,
+        )
+        try:
+            async with session.get(
+                search_url,
+                params=params,
+                timeout=timeout,
+                headers={"Accept": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    log.info(
+                        "jacket search failed",
+                        status=response.status,
+                        reason=response.reason,
+                        body=await response.text(),
+                        indexer=indexer,
+                    )
+                    return []
+                response_json = await response.json()
+        except TimeoutError as err:
+            log.error(
+                "jacket search timeout",
+                error=err,
+                query=search_query.model_dump(),
+                params=params,
+                url=search_url,
+                indexer=indexer,
             )
+            return []
 
     search_results: list[SearchResult] = sorted(
         [SearchResult(**result) for result in response_json["Results"]],
@@ -91,6 +117,49 @@ async def search(
     )
 
     return prioritized_list
+
+
+@timestamped
+async def search_indexers(
+    debrid_api_key: str,
+    jackett_url: str,
+    jackett_api_key: str,
+    search_query: SearchQuery,
+    max_results: int,
+    imdb: int | None = None,
+    timeout: int = 60,
+    indexers: list[str] = ALL_INDEXERS,
+) -> list[Torrent]:
+    log.info("searching indexers", indexers=indexers)
+    torrents: dict[str, Torrent] = {}
+    tasks = [
+        asyncio.create_task(
+            search_indexer(
+                debrid_api_key=debrid_api_key,
+                jackett_url=jackett_url,
+                jackett_api_key=jackett_api_key,
+                search_query=search_query,
+                max_results=max_results,
+                imdb=imdb,
+                timeout=timeout / 3,
+                indexer=indexer,
+            )
+        )
+        for indexer in indexers
+    ]
+    for task in asyncio.as_completed(tasks):
+        indexer_results: list[Optional[Torrent]] = await task
+        for torrent in indexer_results:
+            if torrent:
+                torrents[torrent.info_hash] = torrent
+                if len(torrents) >= max_results:
+                    break
+
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+
+    return list(torrents.values())
 
 
 async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:

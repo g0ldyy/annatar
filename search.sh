@@ -12,7 +12,7 @@ if [ -z "${kind}" ] || [ -z "${term}" ]; then
 fi
 
 if [ "${provider}" == "real-debrid" ]; then
-	http --timeout 30 \
+	http --timeout 60 \
 		":8000/stream/${kind}/${term}.json" \
 		streamService==real-debrid \
 		jackettUrl==https://jackett.blockloop.io \
@@ -20,7 +20,7 @@ if [ "${provider}" == "real-debrid" ]; then
 		debridApiKey==$(op read "op://Personal/Real-debrid/API Token") \
 		maxResults==${max_results}
 elif [ "${provider}" == "premiumize" ]; then
-	http --timeout 30 \
+	http --timeout 60 \
 		":8000/stream/${kind}/${term}.json" \
 		streamService==premiumize \
 		jackettUrl==https://jackett.blockloop.io \
