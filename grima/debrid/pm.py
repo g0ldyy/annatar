@@ -7,13 +7,17 @@ from os import getenv
 from typing import Generic, Optional, Tuple, Type, TypeVar
 
 import aiohttp
+import structlog
 from pydantic import BaseModel
+from structlog.contextvars import bind_contextvars
 
 from grima import human
 from grima.debrid import magnet
 from grima.debrid.models import StreamLink
 from grima.debrid.pm_models import DirectDL, DirectDLResponse
 from grima.torrent import Torrent
+
+log = structlog.get_logger(__name__)
 
 ROOT_URL = "https://www.premiumize.me/api"
 
@@ -58,9 +62,9 @@ async def select_stream_file(
     for file in sorted_files:
         path = file.path.split("/")[-1].lower()
         if human.match_season_episode(season_episode=season_episode, file=path):
-            print(f"Found {season_episode} in {path}")
+            log.info("path matches season and episode", path=path, season_episode=season_episode)
             return StreamLink(name=file.path.split("/")[-1], size=file.size, url=file.link)
-    print(f"No file found for {season_episode}")
+    log.info("no file found for season and episode", season_episode=season_episode)
     return None
 
 
@@ -71,7 +75,7 @@ async def get_stream_link(
 ) -> StreamLink | None:
     info_hash: str | None = magnet.get_info_hash(magnet_link)
     if not info_hash:
-        print(f"magnet:{magnet_link} is not a valid magnet link")
+        log.error("magnet is not a valid magnet link", magnet_link=magnet_link)
         return None
 
     dl, res = await make_request(
@@ -82,13 +86,13 @@ async def get_stream_link(
         data={"src": magnet_link},
     )
     if res.status not in range(200, 299):
-        print(
-            f"magnet:{info_hash} failed to lookup pm cache. status:{res.status}. body:{await res.text()}"
+        log.error(
+            "failed to lookup cache", info_hash=info_hash, status=res.status, body=await res.text()
         )
         return None
 
     if not dl.content:
-        print(f"magnet:{info_hash} has no cached content")
+        log.info("magnet has no cached content", info_hash=info_hash)
         return None
 
     return await select_stream_file(dl.content, season_episode)

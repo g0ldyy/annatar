@@ -1,7 +1,10 @@
 from typing import Optional
 
 import aiohttp
+import structlog
 from pydantic import BaseModel
+
+log = structlog.get_logger(__name__)
 
 
 class Stream(BaseModel):
@@ -45,8 +48,11 @@ async def get_media_info(id: str, type: str) -> MediaInfo | None:
         api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
         async with session.get(api_url) as response:
             if response.status not in range(200, 300):
-                print(
-                    f"Error retrieving MediaInfo from strem.io: status={response.status} reason={response.reason}"
+                log.error(
+                    "Error retrieving MediaInfo from strem.io",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
                 )
                 return None
             response_json = await response.json()

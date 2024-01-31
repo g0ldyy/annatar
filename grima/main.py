@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 import structlog
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from structlog.contextvars import bind_contextvars, bound_contextvars, clear_contextvars
 
 from grima import human, jackett, logging
@@ -27,16 +27,20 @@ log = structlog.get_logger(__name__)
 async def add_process_time_header(request: Request, call_next: Callable[[Request], Any]):
     with bound_contextvars(
         method=request.method,
-        path=request.url.path,
         query=request.url.query,
         remote=request.client.host if request.client else None,
     ):
-        log.info("http_request")
         start_time: datetime = datetime.now()
+        log.info("http_request")
         response: Any = await call_next(request)
         process_time = f"{(datetime.now() - start_time).total_seconds():.3f}s"
         response.headers["X-Process-Time"] = process_time
-        log.info("http_response", duration=process_time, status=response.status_code)
+        log.info(
+            "http_response",
+            duration=process_time,
+            status=response.status_code,
+            path=request.scope.get("route", APIRouter()).path,
+        )
         return response
 
 
