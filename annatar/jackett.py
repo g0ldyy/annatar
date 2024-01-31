@@ -8,9 +8,9 @@ import aiohttp
 import structlog
 from structlog.contextvars import bound_contextvars
 
-from grima.debrid import magnet
-from grima.jackett_models import SearchQuery, SearchResult
-from grima.torrent import Torrent
+from annatar.debrid import magnet
+from annatar.jackett_models import SearchQuery, SearchResult
+from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]

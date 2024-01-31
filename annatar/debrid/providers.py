@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from grima.debrid import pm, rd
-from grima.debrid.models import StreamLink
-from grima.torrent import Torrent
+from annatar.debrid import pm, rd
+from annatar.debrid.models import StreamLink
+from annatar.torrent import Torrent
 
 
 class DebridService(ABC):

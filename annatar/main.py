@@ -8,12 +8,12 @@ import structlog
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-from grima import human, jackett, logging
-from grima.debrid.models import StreamLink
-from grima.debrid.providers import DebridService, get_provider
-from grima.jackett_models import SearchQuery
-from grima.stremio import Stream, StreamResponse, get_media_info
-from grima.torrent import Torrent
+from annatar import human, jackett, logging
+from annatar.debrid.models import StreamLink
+from annatar.debrid.providers import DebridService, get_provider
+from annatar.jackett_models import SearchQuery
+from annatar.stremio import Stream, StreamResponse, get_media_info
+from annatar.torrent import Torrent
 
 logging.init()
 app = FastAPI()
@@ -54,14 +54,14 @@ async def http_mw(request: Request, call_next: Callable[[Request], Any]):
 @app.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
     return {
-        "id": "community.blockloop.grima",
+        "id": "community.blockloop.annatar",
         "icon": "https://i.imgur.com/wEYQYN8.png",
         "version": "0.1.0",
         "catalogs": [],
         "resources": ["stream"],
         "types": ["movie", "series"],
-        "name": "Grima",
-        "description": "Stremio Grima Addon",
+        "name": "Annatar",
+        "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
             "configurable": "true",
         },

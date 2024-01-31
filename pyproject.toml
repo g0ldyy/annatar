@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "grima"
+name = "annatar"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
@@ -29,5 +29,5 @@ profile = "black"
 line-length = 100
 
 [tool.pyright]
-strict = ["grima/*.py"]
+strict = ["annatar/*.py"]
 remove_redundant_aliases = true

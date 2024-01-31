@@ -8,16 +8,16 @@ import structlog
 from pydantic import BaseModel
 from structlog.contextvars import bound_contextvars
 
-from grima import human
-from grima.debrid.models import StreamLink
-from grima.debrid.rd_models import (
+from annatar import human
+from annatar.debrid.models import StreamLink
+from annatar.debrid.rd_models import (
     InstantFile,
     StreamableFile,
     TorrentFile,
     TorrentInfo,
     UnrestrictedLink,
 )
-from grima.torrent import Torrent
+from annatar.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 

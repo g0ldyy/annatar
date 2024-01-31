@@ -5,7 +5,7 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel
 
-from grima.torrent import Torrent
+from annatar.torrent import Torrent
 
 
 class InstantFile(BaseModel):

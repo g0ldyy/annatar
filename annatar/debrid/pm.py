@@ -9,11 +9,11 @@ import structlog
 from pydantic import BaseModel
 from structlog.contextvars import bind_contextvars
 
-from grima import human
-from grima.debrid import magnet
-from grima.debrid.models import StreamLink
-from grima.debrid.pm_models import DirectDL, DirectDLResponse
-from grima.torrent import Torrent
+from annatar import human
+from annatar.debrid import magnet
+from annatar.debrid.models import StreamLink
+from annatar.debrid.pm_models import DirectDL, DirectDLResponse
+from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
