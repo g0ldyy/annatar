@@ -55,42 +55,43 @@ def init():
 R = TypeVar("R")
 
 
-def timestamped(func: Callable[..., R]) -> Any:
-    # execution_time code_line=66 duration="0.459s" logger="annatar.logging" code_func="async_wrapper" function="annatar.debrid.pm:get_stream_links" request_id="3bdf27b5-4e8f-46f7-ab73-fbae2881d832"
-    remove_keys: list[str] = [
-        "logger",
-        "code_func",
-        "code_line",
-        "function",
-        "duration",
-    ]
-    if asyncio.iscoroutinefunction(func):
+def timestamped(log_args: list[str] = []):
+    def decorator(func: Callable[..., R]) -> Callable[..., Any]:
+        if asyncio.iscoroutinefunction(func):
 
-        @wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> R:
-            start_time = datetime.now()
-            result: R = await func(*args, **kwargs)
-            end_time = datetime.now()
-            structlog.get_logger().try_unbind(remove_keys).info(
-                "execution_time",
-                function=f"{func.__module__}:{func.__name__}",
-                duration=f"{(end_time - start_time).total_seconds():.3f}s",
-            )
-            return result
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> R:
+                start_time = datetime.now()
+                result: R = await func(*args, **kwargs)
+                end_time = datetime.now()
+                duration = "{:.4f}s".format((end_time - start_time).total_seconds())
+                logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
+                structlog.get_logger().info(
+                    "execution_time",
+                    function=func.__name__,
+                    duration=duration,
+                    **logged_args,
+                )
+                return result
 
-        return async_wrapper
-    else:
+            return async_wrapper
+        else:
 
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> R:
-            start_time = datetime.now()
-            result: R = func(*args, **kwargs)
-            end_time = datetime.now()
-            structlog.get_logger().try_unbind(remove_keys).info(
-                "execution_time",
-                function=f"{func.__module__}:{func.__name__}",
-                duration=f"{(end_time - start_time).total_seconds():.3f}s",
-            )
-            return result
+            @wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> R:
+                start_time = datetime.now()
+                result: R = func(*args, **kwargs)
+                end_time = datetime.now()
+                duration = "{:.4f}s".format((end_time - start_time).total_seconds())
+                logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
+                structlog.get_logger().info(
+                    "execution_time",
+                    function=func.__name__,
+                    duration=duration,
+                    **logged_args,
+                )
+                return result
 
-        return wrapper
+            return wrapper
+
+    return decorator

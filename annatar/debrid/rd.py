@@ -26,7 +26,7 @@ ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 log = structlog.get_logger(__name__)
 
 
-@timestamped
+@timestamped()
 async def select_biggest_file(
     files: list[TorrentFile],
     season_episode: list[int],
@@ -58,7 +58,7 @@ async def select_biggest_file(
     return 0
 
 
-@timestamped
+@timestamped()
 async def add_link(magnet_link: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
@@ -76,7 +76,7 @@ async def add_link(magnet_link: str, debrid_token: str) -> str | None:
             return response_json["id"]
 
 
-@timestamped
+@timestamped()
 async def get_instant_availability(info_hash: str, debrid_token: str) -> list[InstantFile]:
     api_url = f"{ROOT_URL}/torrents/instantAvailability/{info_hash}"
     async with aiohttp.ClientSession() as session:
@@ -103,7 +103,7 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
     return cached_files
 
 
-@timestamped
+@timestamped()
 async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents"
     async with aiohttp.ClientSession() as session:
@@ -135,7 +135,7 @@ async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
     return None
 
 
-@timestamped
+@timestamped()
 async def get_torrent_info(
     torrent_id: str,
     debrid_token: str,
@@ -157,7 +157,7 @@ async def get_torrent_info(
             return torrent_info
 
 
-@timestamped
+@timestamped()
 async def select_torrent_file(
     torrent_id: str,
     debrid_token: str,
@@ -188,7 +188,7 @@ async def select_torrent_file(
         await session.post(api_url, headers=api_headers, data=body)
 
 
-@timestamped
+@timestamped()
 async def unrestrict_link(
     torrent: Torrent,
     link: str,
@@ -215,7 +215,7 @@ async def unrestrict_link(
             return unrestrict_info
 
 
-@timestamped
+@timestamped()
 async def get_stream_link(
     torrent: Torrent,
     debrid_token: str,
@@ -268,7 +268,7 @@ async def get_stream_link(
         )
 
 
-@timestamped
+@timestamped()
 async def delete_torrent(torrent_id: str, debrid_token: str):
     async with aiohttp.ClientSession() as session:
         api_url = f"{ROOT_URL}/torrents/delete/{torrent_id}"
@@ -277,7 +277,7 @@ async def delete_torrent(torrent_id: str, debrid_token: str):
             log.info("Cleaned up torrent", torrent_id=torrent_id)
 
 
-@timestamped
+@timestamped()
 async def get_stream_links(
     torrents: list[Torrent],
     debrid_token: str,

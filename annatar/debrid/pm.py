@@ -46,7 +46,7 @@ async def make_request(
             return model.model_validate(raw), response
 
 
-@timestamped
+@timestamped()
 async def select_stream_file(
     files: list[DirectDL],
     season_episode: list[int],
@@ -68,7 +68,7 @@ async def select_stream_file(
     return None
 
 
-@timestamped
+@timestamped()
 async def get_stream_link(
     magnet_link: str,
     debrid_token: str,
@@ -99,7 +99,7 @@ async def get_stream_link(
     return await select_stream_file(dl.content, season_episode)
 
 
-@timestamped
+@timestamped()
 async def get_stream_links(
     torrents: list[Torrent],
     debrid_token: str,

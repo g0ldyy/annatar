@@ -1,12 +1,11 @@
 import asyncio
-import re
 from functools import lru_cache
 from typing import Any, Optional
 
 import aiohttp
 import structlog
-from structlog.contextvars import bound_contextvars
 
+from annatar import human
 from annatar.debrid import magnet
 from annatar.jackett_models import SearchQuery, SearchResult
 from annatar.logging import timestamped
@@ -22,12 +21,12 @@ ALL_INDEXERS: list[str] = [
     "eztv",
     "kickasstorrents-ws",
     "thepiratebay",
-    "therarbg",
+    # "therarbg",
     "torrentgalaxy",
 ]
 
 
-@timestamped
+@timestamped(["indexer", "imdb", "jackett_url"])
 async def search_indexer(
     debrid_api_key: str,
     jackett_url: str,
@@ -113,13 +112,13 @@ async def search_indexer(
     # prioritize items by quality
     prioritized_list: list[Torrent] = sorted(
         list(torrents.values()),
-        key=lambda t: sort_priority(search_query.name, t),
+        key=lambda t: human.sort_priority(search_query.name, t.title),
     )
 
     return prioritized_list
 
 
-@timestamped
+@timestamped(["imdb", "jackett_url"])
 async def search_indexers(
     debrid_api_key: str,
     jackett_url: str,
@@ -141,7 +140,7 @@ async def search_indexers(
                 search_query=search_query,
                 max_results=max_results,
                 imdb=imdb,
-                timeout=timeout / 3,
+                timeout=timeout / 5,
                 indexer=indexer,
             )
         )
@@ -203,30 +202,6 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
         return torrent
 
     return None
-
-
-# sort items by quality
-def sort_priority(search_query: str, item: Torrent) -> int:
-    name_pattern: str = re.sub(r"\W+", r"\\W+", search_query)
-    with bound_contextvars(
-        search_query=search_query,
-        name_pattern=name_pattern,
-        torrent=item.info_hash,
-    ):
-        log.debug("set torrent priority")
-
-        priority: int = 50
-        reason: str = "no priority matches"
-        for index, quality in enumerate(PRIORITY_WORDS):
-            if re.search(quality, item.title, re.IGNORECASE):
-                if re.search(name_pattern, item.title, re.IGNORECASE):
-                    priority = index
-                    reason = f"matched {quality} and name"
-                else:
-                    priority = index + 10
-                    reason = f"matched {quality}, mismatch name"
-        log.debug("torrent priority set", priority=priority, reason=reason)
-        return priority
 
 
 @lru_cache(maxsize=1024, typed=True)

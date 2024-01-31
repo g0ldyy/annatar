@@ -124,6 +124,11 @@ async def search(
         max_results=maxResults,
     )
 
+    sorted_links: list[StreamLink] = sorted(
+        links,
+        key=lambda x: human.sort_priority(q.name, x.name),
+    )
+
     streams: list[Stream] = [
         Stream(
             title=media_info.name,
@@ -135,7 +140,6 @@ async def search(
                 ]
             ),
         )
-        for link in links
-        if link
+        for link in sorted_links
     ]
     return StreamResponse(streams=streams)
