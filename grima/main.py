@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request
-from structlog.contextvars import bind_contextvars, clear_contextvars
+from structlog.contextvars import bind_contextvars, bound_contextvars, clear_contextvars
 
 from grima import human, jackett, logging
 from grima.debrid.models import StreamLink
@@ -24,30 +24,29 @@ log = structlog.get_logger(__name__)
 
 
 @app.middleware("http")
+async def add_process_time_header(request: Request, call_next: Callable[[Request], Any]):
+    with bound_contextvars(
+        method=request.method,
+        path=request.url.path,
+        query=request.url.query,
+        remote=request.client.host if request.client else None,
+    ):
+        log.info("http_request")
+        start_time: datetime = datetime.now()
+        response: Any = await call_next(request)
+        process_time = f"{(datetime.now() - start_time).total_seconds():.3f}s"
+        response.headers["X-Process-Time"] = process_time
+        log.info("http_response", duration=process_time, status=response.status_code)
+        return response
+
+
+@app.middleware("http")
 async def add_request_id(request: Request, call_next: Callable[[Request], Any]):
     request_id.set(request.headers.get("X-Request-ID", str(uuid.uuid4())))
     clear_contextvars()
     bind_contextvars(request_id=request_id.get())
     response: Any = await call_next(request)
     response.headers["X-Request-ID"] = str(request_id.get())
-    return response
-
-
-@app.middleware("http")
-async def add_process_time_header(request: Request, call_next: Callable[[Request], Any]):
-    ll = log.bind(
-        method=request.method,
-        path=request.url.path,
-        query=request.url.query,
-        remote=request.client.host if request.client else None,
-    )
-    ll.info("http_request")
-
-    start_time: datetime = datetime.now()
-    response: Any = await call_next(request)
-    process_time = datetime.now() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    ll.info("http_response", duration=f"{process_time.total_seconds():.3f}s")
     return response
 
 
@@ -85,7 +84,6 @@ async def search(
     if not id.startswith("tt"):
         raise HTTPException(status_code=400, detail="Invalid id. Id must be an IMDB id with tt")
 
-    start: datetime = datetime.now()
     imdb_id = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
     log.info("searching for media", type=type, id=id)
@@ -139,12 +137,4 @@ async def search(
         for link in links
         if link
     ]
-    log.info(
-        "HTTP request duration",
-        method="search",
-        duration_ms=(datetime.now() - start).microseconds / 1000,
-        type=type,
-        id=id,
-        num_streams=len(streams),
-    )
     return StreamResponse(streams=streams)

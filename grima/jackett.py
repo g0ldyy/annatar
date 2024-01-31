@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 import aiohttp
 import structlog
+from structlog.contextvars import bound_contextvars
 
 from grima.debrid import magnet
 from grima.jackett_models import SearchQuery, SearchResult
@@ -49,7 +50,12 @@ async def search(
             headers={"Accept": "application/json"},
         ) as response:
             if response.status != 200:
-                print(f"No results from Jackett status:{response.status}")
+                log.info(
+                    "jacket search failed",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
+                )
                 return []
             log.info(
                 "jacket search completed",
@@ -93,7 +99,11 @@ async def search(
 
 async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:
     if imdb and result.Imdb and result.Imdb != imdb:
-        print(f"Skipping mismatched IMDB {result.Imdb} for {result.Title}. Expected {imdb}")
+        log.info(
+            "skipping mismatched IMDB",
+            wanted=imdb,
+            result=result.model_dump(),
+        )
         return None
 
     if result.InfoHash and result.MagnetUri:
@@ -109,15 +119,14 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
     if result.Link and result.Link.startswith("http"):
         magnet_link: str | None = await resolve_magnet_link(guid=result.Guid, link=result.Link)
         if not magnet_link:
-            print(f"Could not resolve magnet link for {result.Link}. Skipping")
             return None
 
         info_hash: str | None = result.InfoHash or magnet.get_info_hash(magnet_link)
         if not info_hash:
-            print(f"Could not find info hash for {magnet_link}. Skipping")
+            log.info("Could not find info hash in magnet link", magnet=magnet_link)
             return None
 
-        return Torrent(
+        torrent: Torrent = Torrent(
             guid=result.Guid,
             info_hash=info_hash,
             title=result.Title,
@@ -125,6 +134,8 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
             url=magnet_link,
             seeders=result.Seeders,
         )
+        log.info("found torrent", torrent=torrent.model_dump())
+        return torrent
 
     return None
 
@@ -132,20 +143,23 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
 # sort items by quality
 def sort_priority(search_query: str, item: Torrent) -> int:
     name_pattern: str = re.sub(r"\W+", r"\\W+", search_query)
-    print(f"search_query:{search_query} name_pattern:{name_pattern}")
+    with bound_contextvars(
+        search_query=search_query, name_pattern=name_pattern, torrent=item.model_dump()
+    ):
+        log.debug("set torrent priority")
 
-    priority: int = 50
-    reason: str = "no priority matches"
-    for index, quality in enumerate(PRIORITY_WORDS):
-        if re.search(quality, item.title, re.IGNORECASE):
-            if re.search(name_pattern, item.title, re.IGNORECASE):
-                priority = index
-                reason = f"matched {quality} and name"
-            else:
-                priority = index + 10
-                reason = f"matched {quality}, mismatch name"
-    print(f"torrent:{item.title} priority: {priority}. reason:{reason}")
-    return priority
+        priority: int = 50
+        reason: str = "no priority matches"
+        for index, quality in enumerate(PRIORITY_WORDS):
+            if re.search(quality, item.title, re.IGNORECASE):
+                if re.search(name_pattern, item.title, re.IGNORECASE):
+                    priority = index
+                    reason = f"matched {quality} and name"
+                else:
+                    priority = index + 10
+                    reason = f"matched {quality}, mismatch name"
+        log.debug("torrent priority set", priority=priority, reason=reason)
+        return priority
 
 
 @lru_cache(maxsize=1024, typed=True)
@@ -159,13 +173,13 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
     if link.startswith("magnet"):
         return link
 
-    print(f"Following redirect for {link}")
+    log.info("magnet resolve: following redirect", guid=guid, link=link)
     async with aiohttp.ClientSession() as session:
         async with session.get(link, allow_redirects=False, timeout=5) as response:
             if response.status == 302:
                 location = response.headers.get("Location", "")
-                print(f"Updated link to {location}.")
+                log.info("magnet resolve: found redirect", guid=guid, magnet=location)
                 return location
             else:
-                print(f"Didn't find redirect: {response.status}. No magnet link could be found.")
+                log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
                 return None
