@@ -140,7 +140,9 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
 def sort_priority(search_query: str, item: Torrent) -> int:
     name_pattern: str = re.sub(r"\W+", r"\\W+", search_query)
     with bound_contextvars(
-        search_query=search_query, name_pattern=name_pattern, torrent=item.model_dump()
+        search_query=search_query,
+        name_pattern=name_pattern,
+        torrent=item.info_hash,
     ):
         log.debug("set torrent priority")
 

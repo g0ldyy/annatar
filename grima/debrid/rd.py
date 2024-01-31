@@ -212,48 +212,51 @@ async def get_stream_link(
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
-    ll = log.bind(info_hash=torrent.info_hash, kind="series" if season_episode else "movie")
-    cached_files: list[InstantFile] = await get_instant_availability(
-        torrent.info_hash, debrid_token
-    )
-    if not cached_files:
-        return None
-
-    torrent_id = await add_link(magnet_link=torrent.url, debrid_token=debrid_token)
-    if not torrent_id:
-        ll.info("no torrent id found")
-        return None
-
-    ll.info("magnet added to RD")
-
-    ll.info("selecting media file in torrent")
-    await select_torrent_file(
-        torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
-    )
-
-    torrent_link: str | None = await get_torrent_link(
+    with bound_contextvars(
         info_hash=torrent.info_hash,
-        debrid_token=debrid_token,
-    )
-    if not torrent_link:
-        ll.info("no torrent link found")
-        return None
+        kind="series" if season_episode else "movie",
+    ):
+        cached_files: list[InstantFile] = await get_instant_availability(
+            torrent.info_hash, debrid_token
+        )
+        if not cached_files:
+            return None
 
-    ll.info("RD Cached links found", link=torrent_link)
+        torrent_id = await add_link(magnet_link=torrent.url, debrid_token=debrid_token)
+        if not torrent_id:
+            log.info("no torrent id found")
+            return None
 
-    unrestricted_link: UnrestrictedLink | None = await unrestrict_link(
-        torrent=torrent,
-        link=torrent_link,
-        debrid_token=debrid_token,
-    )
-    if not unrestricted_link:
-        ll.info("no unrestrict link found")
-        return None
-    return StreamLink(
-        size=unrestricted_link.filesize,
-        name=unrestricted_link.filename,
-        url=unrestricted_link.download,
-    )
+        log.info("magnet added to RD")
+
+        log.info("selecting media file in torrent")
+        await select_torrent_file(
+            torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
+        )
+
+        torrent_link: str | None = await get_torrent_link(
+            info_hash=torrent.info_hash,
+            debrid_token=debrid_token,
+        )
+        if not torrent_link:
+            log.info("no torrent link found")
+            return None
+
+        log.info("RD Cached links found", link=torrent_link)
+
+        unrestricted_link: UnrestrictedLink | None = await unrestrict_link(
+            torrent=torrent,
+            link=torrent_link,
+            debrid_token=debrid_token,
+        )
+        if not unrestricted_link:
+            log.info("no unrestrict link found")
+            return None
+        return StreamLink(
+            size=unrestricted_link.filesize,
+            name=unrestricted_link.filename,
+            url=unrestricted_link.download,
+        )
 
 
 async def delete_torrent(torrent_id: str, debrid_token: str):
