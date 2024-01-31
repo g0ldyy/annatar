@@ -4,7 +4,9 @@ from os import getenv
 from typing import Optional
 
 import aiohttp
+import structlog
 from pydantic import BaseModel
+from structlog.contextvars import bound_contextvars
 
 from grima import human
 from grima.debrid.models import StreamLink
@@ -20,29 +22,36 @@ from grima.torrent import Torrent
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
 
+log = structlog.get_logger(__name__)
+
+
 async def select_biggest_file(
     files: list[TorrentFile],
     season_episode: list[int],
 ) -> int:
     if len(files) == 0:
-        print("No files, returning 0")
+        log.debug("No files, returning 0")
         return 0
     sorted_files: list[TorrentFile] = sorted(files, key=lambda f: f.bytes, reverse=True)
     if len(files) == 1:
-        print(f"Only one file, returning {files[0].id}")
+        log.debug("Only one file, returning", file=files[0])
         return files[0].id
 
     if not season_episode:
-        print(f"No season_episode, returning {sorted_files[0].id}")
+        log.info("No season_episode, returning", file=sorted_files[0])
         return sorted_files[0].id
 
     for file in sorted_files:
         path = file.path.lower()
         if human.match_season_episode(season_episode=season_episode, file=path):
-            print(f"Found {human.pretty_season_episode(season_episode)} in {path}")
+            log.info(
+                "found matched file for season/episode", file=file, season_episode=season_episode
+            )
             return file.id
-    print(
-        f"""No file found for {human.pretty_season_episode(season_episode)}, returning first item."""
+    log.info(
+        "No file found for season/episode, returning first file",
+        file=sorted_files[0],
+        season_episode=season_episode,
     )
     return 0
 
@@ -51,33 +60,34 @@ async def add_link(magnet_link: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
-            print(f"Got status adding magnet to RD: status={response.status}, magnet={magnet_link}")
             if response.status not in range(200, 300):
+                log.error(
+                    "Got status adding magnet to RD", status=response.status, magnet=magnet_link
+                )
                 return None
             response_json = await response.json()
-            print(f"Magnet added to RD: Torrent:{magnet_link}")
+            log.info("Magnet added to RD", torrent=response_json["id"], magnet=magnet_link)
             return response_json["id"]
 
 
 async def get_instant_availability(info_hash: str, debrid_token: str) -> list[InstantFile]:
     api_url = f"{ROOT_URL}/torrents/instantAvailability/{info_hash}"
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
             if response.status not in range(200, 300):
-                print(
-                    f"torrent:{info_hash}: Error getting instant availability: status:{response.status}"
+                log.error(
+                    "Error getting instant availability",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
                 )
-                response.raise_for_status()
                 return []
             res = await response.json()
 
-    # print(f"torrent:{info_hash}: Got instant availability: {json.dumps(res, indent=2)}")
     cached_files: list[InstantFile] = [
         InstantFile(id=int(id_key), **file_info)
         for value in res.values()
@@ -85,34 +95,38 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
         for item in value.get("rd", [])
         for id_key, file_info in item.items()
     ]
-    print(f"Found {len(cached_files)} cached files.")
+    log.info("found cached files", count=len(cached_files))
     return cached_files
 
 
 async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
     api_url = f"{ROOT_URL}/torrents"
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
             if response.status not in range(200, 300):
-                print(f"Error getting torrent list: {response.status}")
+                log.error(
+                    "Error getting torrent list",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
+                )
                 return None
             response_json = await response.json()
-    # parse list of TorrentInfo from response.json()
-    print(f"torrent:{info_hash}: Got torrent list: {json.dumps(response_json, indent=2)}")
+
+    log.info("Got torrent list", count=len(response_json), info_hash=info_hash)
     for torrent in response_json:
         if torrent["hash"].lower() != info_hash.lower():
             continue
         links = torrent["links"]
         if links:
             link = links[0]
-            print(f"torrent:{info_hash}: Torrent link found: {link}")
+            log.info("Torrent link found", link=link, info_hash=info_hash)
             return link
         else:
-            print(f"torrent:{info_hash}: Torrent has no links?")
+            log.info("Torrent has no links", torrent=torrent, info_hash=info_hash)
             return None
-    print(f"torrent:{info_hash}: Torrent not found in list.")
+    log.info("Torrent not found in list", info_hash=info_hash)
     return None
 
 
@@ -121,12 +135,16 @@ async def get_torrent_info(
     debrid_token: str,
 ) -> TorrentInfo | None:
     api_url = f"{ROOT_URL}/torrents/info/{torrent_id}"
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.get(api_url, headers=api_headers) as response:
             if response.status not in range(200, 300):
-                print(f"Error getting torrent info: {response.status}")
+                log.error(
+                    "Error getting torrent info",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
+                )
                 return None
             response_json = await response.json()
             torrent_info: TorrentInfo = TorrentInfo(**response_json)
@@ -144,16 +162,20 @@ async def select_torrent_file(
     )
 
     if not torrent_info:
-        print("torrent:{torrent_id}. No torrent info found.")
+        log.info("No torrent info found", torrent_id=torrent_id)
         return
 
     torrent_files: list[TorrentFile] = torrent_info.files
     torrent_file_id = await select_biggest_file(files=torrent_files, season_episode=season_episode)
-    print(f"torrent:{torrent_id}: Selected file: {torrent_file_id}")
+    log.info(
+        "Selected file",
+        torrent_id=torrent_id,
+        torrent_file_id=torrent_file_id,
+        season_episode=season_episode,
+    )
     api_url = f"{ROOT_URL}/torrents/selectFiles/{torrent_id}"
     body = {"files": torrent_file_id}
 
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         await session.post(api_url, headers=api_headers, data=body)
@@ -167,19 +189,21 @@ async def unrestrict_link(
     api_url = f"{ROOT_URL}/unrestrict/link"
     body = {"link": link}
 
-    print(api_url)
     async with aiohttp.ClientSession() as session:
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.post(api_url, headers=api_headers, data=body) as response:
             if response.status not in range(200, 300):
-                print(
-                    f"torrent:{torrent.info_hash}: Error getting unrestrict/link: {response.status}"
+                log.error(
+                    "Error getting unrestrict link",
+                    status=response.status,
+                    reason=response.reason,
+                    body=await response.text(),
                 )
                 return None
             unrestrict_response_json = await response.json()
             unrestrict_response_json["torrent"] = torrent
             unrestrict_info: UnrestrictedLink = UnrestrictedLink(**unrestrict_response_json)
-            print(f"torrent:{torrent.info_hash}: RD link: {unrestrict_info.download}")
+            log.info("Got unrestrict link", link=unrestrict_info.link, info_hash=torrent.info_hash)
             return unrestrict_info
 
 
@@ -188,23 +212,21 @@ async def get_stream_link(
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
+    ll = log.bind(info_hash=torrent.info_hash, kind="series" if season_episode else "movie")
     cached_files: list[InstantFile] = await get_instant_availability(
         torrent.info_hash, debrid_token
     )
     if not cached_files:
         return None
-    print(f"torrent:{torrent.info_hash}: {len(cached_files)} cached files found.")
 
     torrent_id = await add_link(magnet_link=torrent.url, debrid_token=debrid_token)
     if not torrent_id:
-        print(f"torrent:{torrent.info_hash}: No torrent for {torrent.url}.")
+        ll.info("no torrent id found")
         return None
 
-    print(f"torrent:{torrent.info_hash}: Magnet added to RD")
+    ll.info("magnet added to RD")
 
-    print(
-        f"torrent:{torrent_id}: Setting selecting {season_episode if season_episode else 'movie'} file."
-    )
+    ll.info("selecting media file in torrent")
     await select_torrent_file(
         torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
     )
@@ -214,10 +236,10 @@ async def get_stream_link(
         debrid_token=debrid_token,
     )
     if not torrent_link:
-        print(f"torrent:{torrent.info_hash}: No torrent links found.")
+        ll.info("no torrent link found")
         return None
 
-    print(f"torrent:{torrent.info_hash}: RD Cached links found.")
+    ll.info("RD Cached links found", link=torrent_link)
 
     unrestricted_link: UnrestrictedLink | None = await unrestrict_link(
         torrent=torrent,
@@ -225,7 +247,7 @@ async def get_stream_link(
         debrid_token=debrid_token,
     )
     if not unrestricted_link:
-        print(f"torrent:{torrent.info_hash}: Could not get unrestrict link")
+        ll.info("no unrestrict link found")
         return None
     return StreamLink(
         size=unrestricted_link.filesize,
@@ -239,7 +261,7 @@ async def delete_torrent(torrent_id: str, debrid_token: str):
         api_url = f"{ROOT_URL}/torrents/delete/{torrent_id}"
         api_headers = {"Authorization": f"Bearer {debrid_token}"}
         async with session.delete(api_url, headers=api_headers) as response:
-            print(f"torrent:{torrent_id} cleaned up torrent")
+            log.info("Cleaned up torrent", torrent_id=torrent_id)
 
 
 async def get_stream_links(
@@ -260,6 +282,4 @@ async def get_stream_links(
         )
         for torrent in torrents
     ]
-    results = await asyncio.gather(*tasks)
-
-    return [r for r in results if r]
+    return [r for r in await asyncio.gather(*tasks) if r]

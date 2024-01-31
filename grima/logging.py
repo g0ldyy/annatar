@@ -19,9 +19,9 @@ root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def add_code_info(logger: logging.Logger, method_name: str, event_dict: Any) -> Dict[str, Any]:
     frame = inspect.currentframe().f_back.f_back.f_back.f_back.f_back  # type: ignore
-    event_dict["func"] = frame.f_code.co_name  # type: ignore
+    event_dict["code_func"] = frame.f_code.co_name  # type: ignore
     fname: str = frame.f_code.co_filename.replace(root_dir, "").lstrip("/")  # type: ignore
-    event_dict["file"] = f"{fname}:{frame.f_lineno}"  # type: ignore
+    event_dict["code_file"] = f"{fname}:{frame.f_lineno}"  # type: ignore
     return event_dict
 
 

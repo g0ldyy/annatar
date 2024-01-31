@@ -1,5 +1,9 @@
 import re
 
+import structlog
+
+log = structlog.get_logger(__name__)
+
 
 def bytes(num: float) -> str:
     """
@@ -23,7 +27,6 @@ def match_season_episode(season_episode: list[int], file: str) -> bool:
         e=season_episode[1],
     )
 
-    print(f"Searching for {pattern} in {file}")
-    if re.findall(pattern, file, re.IGNORECASE):
-        return True
-    return False
+    result = bool(re.search(pattern, file, re.IGNORECASE))
+    log.debug("pattern match result", pattern=pattern, file=file, result=result)
+    return result
