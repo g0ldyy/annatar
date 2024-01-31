@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import json
 from os import getenv
 from typing import Optional
@@ -253,16 +252,14 @@ async def get_stream_links(
     Generates a list of RD links for each torrent link.
     """
 
-    def __run(torrent: Torrent) -> Optional[StreamLink]:
-        return asyncio.run(
-            get_stream_link(
-                torrent=torrent,
-                season_episode=season_episode,
-                debrid_token=debrid_token,
-            )
+    tasks = [
+        get_stream_link(
+            torrent=torrent,
+            season_episode=season_episode,
+            debrid_token=debrid_token,
         )
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(__run, torrents))
+        for torrent in torrents
+    ]
+    results = await asyncio.gather(*tasks)
 
     return [r for r in results if r]

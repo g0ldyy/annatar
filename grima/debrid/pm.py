@@ -1,8 +1,6 @@
 import asyncio
-import concurrent.futures
 import json
 import re
-from concurrent.futures import as_completed
 from os import getenv
 from typing import Generic, Optional, Tuple, Type, TypeVar
 
@@ -108,30 +106,28 @@ async def get_stream_links(
     Generates a list of stream links for each torrent link.
     """
 
-    def __run(torrent: Torrent) -> Optional[StreamLink]:
-        return asyncio.run(
+    links: dict[str, StreamLink] = {}
+    tasks = [
+        asyncio.create_task(
             get_stream_link(
                 magnet_link=torrent.url,
                 season_episode=season_episode,
                 debrid_token=debrid_token,
             )
         )
+        for torrent in torrents
+    ]
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(__run, torrents))
+    for task in asyncio.as_completed(tasks):
+        link: Optional[StreamLink] = await task
+        if link:
+            links[link.url] = link
+            if len(links) >= max_results:
+                break
 
-    links: dict[str, StreamLink] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(__run, torrent) for torrent in torrents]
-
-        for future in as_completed(futures):
-            link: StreamLink | None = future.result()
-            if link:
-                links[link.url] = link
-                if len(links.keys()) >= max_results:
-                    break
-        # cancel the remaining futures
-        for future in futures:
-            future.cancel()
+    # Cancel remaining tasks
+    for task in tasks:
+        if not task.done():
+            task.cancel()
 
     return list(links.values())[:max_results]

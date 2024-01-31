@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import structlog
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from structlog.contextvars import bind_contextvars, bound_contextvars, clear_contextvars
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from grima import human, jackett, logging
 from grima.debrid.models import StreamLink
@@ -15,42 +15,39 @@ from grima.jackett_models import SearchQuery
 from grima.stremio import Stream, StreamResponse, get_media_info
 from grima.torrent import Torrent
 
+logging.init()
 app = FastAPI()
 
 request_id = ContextVar("request_id", default="unknown")
 
-logging.init()
 log = structlog.get_logger(__name__)
 
 
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next: Callable[[Request], Any]):
-    with bound_contextvars(
+async def http_mw(request: Request, call_next: Callable[[Request], Any]):
+    clear_contextvars()
+    rid: str = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    request_id.set(rid)
+    bind_contextvars(request_id=rid)
+    ll = log.bind(
         method=request.method,
         query=request.url.query,
+        request_id=request_id.get(),
         remote=request.client.host if request.client else None,
-    ):
-        start_time: datetime = datetime.now()
-        log.info("http_request")
-        response: Any = await call_next(request)
-        process_time = f"{(datetime.now() - start_time).total_seconds():.3f}s"
-        response.headers["X-Process-Time"] = process_time
-        log.info(
-            "http_response",
-            duration=process_time,
-            status=response.status_code,
-            path=request.scope.get("route", APIRouter()).path,
-        )
-        return response
+    )
 
-
-@app.middleware("http")
-async def add_request_id(request: Request, call_next: Callable[[Request], Any]):
-    request_id.set(request.headers.get("X-Request-ID", str(uuid.uuid4())))
-    clear_contextvars()
-    bind_contextvars(request_id=request_id.get())
+    start_time: datetime = datetime.now()
+    ll.info("http_request")
     response: Any = await call_next(request)
+    process_time = f"{(datetime.now() - start_time).total_seconds():.3f}s"
+    response.headers["X-Process-Time"] = process_time
     response.headers["X-Request-ID"] = str(request_id.get())
+    ll.info(
+        "http_response",
+        duration=process_time,
+        status=response.status_code,
+        path=request.scope.get("route", APIRouter()).path,
+    )
     return response
 
 

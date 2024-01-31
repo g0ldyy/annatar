@@ -1,7 +1,5 @@
 import asyncio
-import concurrent.futures
 import re
-from concurrent.futures import as_completed
 from datetime import datetime
 from functools import lru_cache
 from typing import Any, Optional
@@ -57,11 +55,11 @@ async def search(
                     body=await response.text(),
                 )
                 return []
+            response_json = await response.json()
             log.info(
                 "jacket search completed",
                 duration=f"{(datetime.now() - start).total_seconds()}s",
             )
-            response_json = await response.json()
 
     search_results: list[SearchResult] = sorted(
         [SearchResult(**result) for result in response_json["Results"]],
@@ -69,24 +67,22 @@ async def search(
         reverse=True,
     )
 
-    # sync map search results to torrents async
-    def __run(result: SearchResult) -> Optional[Torrent]:
-        return asyncio.run(map_matched_result(result=result, imdb=imdb))
-
     torrents: dict[str, Torrent] = {}
+    tasks = [
+        asyncio.create_task(map_matched_result(result=result, imdb=imdb))
+        for result in search_results
+    ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(__run, result) for result in search_results]
+    for task in asyncio.as_completed(tasks):
+        torrent: Optional[Torrent] = await task
+        if torrent:
+            torrents[torrent.info_hash] = torrent
+            if len(torrents) >= max_results:
+                break
 
-        for future in as_completed(futures):
-            torrent: Torrent | None = future.result()
-            if torrent:
-                torrents[torrent.info_hash] = torrent
-                if len(torrents.keys()) >= max_results:
-                    break
-        # cancel the remaining futures
-        for future in futures:
-            future.cancel()
+    for task in tasks:
+        if not task.done():
+            task.cancel()
 
     # prioritize items by quality
     prioritized_list: list[Torrent] = sorted(
@@ -174,12 +170,16 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
         return link
 
     log.info("magnet resolve: following redirect", guid=guid, link=link)
-    async with aiohttp.ClientSession() as session:
-        async with session.get(link, allow_redirects=False, timeout=5) as response:
-            if response.status == 302:
-                location = response.headers.get("Location", "")
-                log.info("magnet resolve: found redirect", guid=guid, magnet=location)
-                return location
-            else:
-                log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
-                return None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link, allow_redirects=False, timeout=1) as response:
+                if response.status == 302:
+                    location = response.headers.get("Location", "")
+                    log.info("magnet resolve: found redirect", guid=guid, magnet=location)
+                    return location
+                else:
+                    log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
+                    return None
+    except TimeoutError as err:
+        log.error("magnet resolve: timeout", guid=guid, error=err)
+        return None

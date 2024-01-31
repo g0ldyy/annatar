@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 from os import getenv
 from typing import Optional
 
