@@ -68,7 +68,7 @@ def timestamped(log_args: list[str] = []):
                 logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
                 structlog.get_logger().info(
                     "execution_time",
-                    function=func.__name__,
+                    function=f"{func.__module__}:{func.__name__}",
                     duration=duration,
                     **logged_args,
                 )
@@ -86,7 +86,7 @@ def timestamped(log_args: list[str] = []):
                 logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
                 structlog.get_logger().info(
                     "execution_time",
-                    function=func.__name__,
+                    function=f"{func.__module__}:{func.__name__}",
                     duration=duration,
                     **logged_args,
                 )

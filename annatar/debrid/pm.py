@@ -23,6 +23,7 @@ ROOT_URL = "https://www.premiumize.me/api"
 T = TypeVar("T", bound=BaseModel)
 
 
+@timestamped(["url", "method"])
 async def make_request(
     api_token: str,
     url: str,
@@ -46,7 +47,6 @@ async def make_request(
             return model.model_validate(raw), response
 
 
-@timestamped()
 async def select_stream_file(
     files: list[DirectDL],
     season_episode: list[int],

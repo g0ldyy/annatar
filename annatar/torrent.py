@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -8,3 +10,4 @@ class Torrent(BaseModel):
     title: str
     url: str
     seeders: int
+    tracker: Optional[str] = ""

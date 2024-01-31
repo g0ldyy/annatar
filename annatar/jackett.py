@@ -101,6 +101,13 @@ async def search_indexer(
         torrent: Optional[Torrent] = await task
         if torrent:
             torrents[torrent.info_hash] = torrent
+            log.info(
+                "found a torrent",
+                tracker=indexer,
+                info_hash=torrent.info_hash,
+                title=torrent.title,
+                seeders=torrent.seeders,
+            )
             if len(torrents) >= max_results:
                 break
 
@@ -163,7 +170,7 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
         log.info(
             "skipping mismatched IMDB",
             wanted=imdb,
-            result=result.model_dump(),
+            got=result.Imdb,
         )
         return None
 
@@ -175,6 +182,7 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
             size=result.Size,
             url=result.MagnetUri,
             seeders=result.Seeders,
+            tracker=result.Tracker,
         )
 
     if result.Link and result.Link.startswith("http"):
@@ -194,8 +202,11 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
             size=result.Size,
             url=magnet_link,
             seeders=result.Seeders,
+            tracker=result.Tracker,
         )
-        log.info("found torrent", torrent=torrent.model_dump())
+        log.info(
+            "found torrent", torrent=torrent.title, seeders=torrent.seeders, tracker=torrent.tracker
+        )
         return torrent
 
     return None

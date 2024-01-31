@@ -72,7 +72,11 @@ async def get_manifest() -> dict[str, Any]:
     }
 
 
-@app.get("/stream/{type:str}/{id:str}.json")
+@app.get(
+    "/stream/{type:str}/{id:str}.json",
+    response_model=StreamResponse,
+    response_model_exclude_none=True,
+)
 async def search(
     type: str,
     id: str,
