@@ -12,18 +12,22 @@ if [ -z "${kind}" ] || [ -z "${term}" ]; then
 fi
 
 if [ "${provider}" == "real-debrid" ]; then
-	http --timeout 60 \
-		":8000/stream/${kind}/${term}.json" \
-		streamService==real-debrid \
-		debridApiKey==$(op read "op://Personal/Real-debrid/API Token") \
-		maxResults==${max_results}
+	debrid_api_key=$(op read "op://Personal/Real-debrid/API Token")
 elif [ "${provider}" == "premiumize" ]; then
-	http --timeout 60 \
-		":8000/stream/${kind}/${term}.json" \
-		streamService==premiumize \
-		debridApiKey==$(op read "op://Personal/Premiumize/API Key") \
-		maxResults==${max_results}
+	debrid_api_key=$(op read "op://Personal/Premiumize/API Key")
 else
 	echo "Invalid provider: ${provider}"
 	exit 1
 fi
+
+config=$(cat <<-EOF | jq -c . | base64 -w0
+{
+	"debrid_service": "${provider}",
+	"debrid_api_key": "${debrid_api_key}",
+	"max_results": ${max_results}
+}
+EOF
+)
+
+http -vv --timeout 60 \
+	":8000/${config}/stream/${kind}/${term}.json"

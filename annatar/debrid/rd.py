@@ -226,7 +226,8 @@ async def get_stream_link(
         kind="series" if season_episode else "movie",
     ):
         cached_files: list[InstantFile] = await get_instant_availability(
-            torrent.info_hash, debrid_token
+            torrent.info_hash,
+            debrid_token,
         )
         if not cached_files:
             return None

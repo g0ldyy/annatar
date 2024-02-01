@@ -21,7 +21,7 @@ ALL_INDEXERS: list[str] = [
     "eztv",
     "kickasstorrents-ws",
     "thepiratebay",
-    # "therarbg",
+    "therarbg",
     "torrentgalaxy",
 ]
 

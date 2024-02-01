@@ -1,20 +1,19 @@
+import json
 import os
-import re
 import uuid
+from base64 import b64decode
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import structlog
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-from annatar import human, jackett, logging
-from annatar.debrid.models import StreamLink
+from annatar import api, logging
 from annatar.debrid.providers import DebridService, get_provider
-from annatar.jackett_models import SearchQuery
-from annatar.stremio import Stream, StreamResponse, get_media_info
-from annatar.torrent import Torrent
+from annatar.stremio import StreamResponse
 
 logging.init()
 app = FastAPI()
@@ -46,11 +45,14 @@ async def http_mw(request: Request, call_next: Callable[[Request], Any]):
     process_time = f"{(datetime.now() - start_time).total_seconds():.3f}s"
     response.headers["X-Process-Time"] = process_time
     response.headers["X-Request-ID"] = str(request_id.get())
+
+    route = request.scope.get("route")
+    path: str = route.path if route else request.url.path
     ll.info(
         "http_response",
         duration=process_time,
         status=response.status_code,
-        path=request.scope.get("route", APIRouter()).path,
+        path=path,
     )
     return response
 
@@ -59,7 +61,7 @@ async def http_mw(request: Request, call_next: Callable[[Request], Any]):
 async def get_manifest() -> dict[str, Any]:
     return {
         "id": "community.blockloop.annatar",
-        "icon": "https://i.imgur.com/wEYQYN8.png",
+        "icon": "https://i.imgur.com/p4V821B.png",
         "version": "0.1.0",
         "catalogs": [],
         "resources": ["stream"],
@@ -73,16 +75,14 @@ async def get_manifest() -> dict[str, Any]:
 
 
 @app.get(
-    "/stream/{type:str}/{id:str}.json",
+    "/{b64config:str}/stream/{type:str}/{id:str}.json",
     response_model=StreamResponse,
     response_model_exclude_none=True,
 )
 async def search(
     type: str,
     id: str,
-    streamService: str,
-    debridApiKey: str,
-    maxResults: int = 5,
+    b64config: str = "e30K",  # base64 encoded json parameter {}
 ) -> StreamResponse:
     if type not in ["movie", "series"]:
         raise HTTPException(
@@ -91,60 +91,36 @@ async def search(
     if not id.startswith("tt"):
         raise HTTPException(status_code=400, detail="Invalid id. Id must be an IMDB id with tt")
 
+    if not b64config:
+        raise HTTPException(status_code=400, detail="Missing config")
+
+    config: AppConfig = parse_config(b64config)
+    debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
+    if not debrid:
+        raise HTTPException(status_code=400, detail="Invalid debrid service")
+
     imdb_id = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
-    log.info("searching for media", type=type, id=id)
-
-    media_info = await get_media_info(id=imdb_id, type=type)
-    if not media_info:
-        log.error("error getting media info", type=type, id=id)
-        return StreamResponse(streams=[], error="Error getting media info")
-    log.info("found media info", type=type, id=id, media_info=media_info.model_dump())
-
-    q = SearchQuery(
-        name=media_info.name,
+    return await api.search(
         type=type,
-        year=re.split(r"\D", (media_info.releaseInfo or ""))[0],
-    )
-
-    if type == "series":
-        q.season = str(season_episode[0])
-        q.episode = str(season_episode[1])
-
-    torrents: list[Torrent] = await jackett.search_indexers(
-        max_results=max(10, maxResults),
-        jackett_url=jackett_url,
-        jackett_api_key=jackett_api_key,
-        search_query=q,
-        imdb=int(imdb_id.replace("tt", "")),
-        timeout=60,
-    )
-
-    debrid_service: DebridService = get_provider(streamService)
-
-    links: list[StreamLink] = await debrid_service.get_stream_links(
-        torrents=torrents,
-        debrid_token=debridApiKey,
+        debrid=debrid,
+        imdb_id=imdb_id,
         season_episode=season_episode,
-        max_results=maxResults,
+        jackett_api_key=jackett_api_key,
+        jackett_url=jackett_url,
+        max_results=config.max_results,
     )
 
-    sorted_links: list[StreamLink] = sorted(
-        links,
-        key=lambda x: human.sort_priority(q.name, x.name),
-    )
 
-    streams: list[Stream] = [
-        Stream(
-            title=media_info.name,
-            url=link.url,
-            name="\n".join(
-                [
-                    link.name,
-                    f"💾{human.bytes(float(link.size))}",
-                ]
-            ),
-        )
-        for link in sorted_links
-    ]
-    return StreamResponse(streams=streams)
+class AppConfig(BaseModel):
+    debrid_service: str
+    debrid_api_key: str
+    max_results: int = 5
+
+
+def parse_config(b64config: str) -> AppConfig:
+    try:
+        return AppConfig(**json.loads(b64decode(b64config)))
+    except Exception as e:
+        log.warning("error decoding config", error=e)
+        raise HTTPException(status_code=400, detail=str(e))
