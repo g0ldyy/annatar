@@ -58,6 +58,19 @@ class PremiumizeProvider(DebridService):
         )
 
 
+def list_providers() -> list[dict[str, str]]:
+    return [
+        {
+            "id": "real_debrid",
+            "name": "Real Debrid",
+        },
+        {
+            "id": "premiumize",
+            "name": "Premiumize.me",
+        },
+    ]
+
+
 def get_provider(provider_name: str, api_key: str) -> Optional[DebridService]:
     if provider_name == "real-debrid":
         return RealDebridProvider(api_key)

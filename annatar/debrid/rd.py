@@ -284,17 +284,34 @@ async def get_stream_links(
     debrid_token: str,
     season_episode: list[int] = [],
     max_results: int = 5,
+    timeout: int = 10,
 ) -> list[StreamLink]:
     """
     Generates a list of RD links for each torrent link.
     """
 
+    links: dict[str, StreamLink] = {}
     tasks = [
-        get_stream_link(
-            torrent=torrent,
-            season_episode=season_episode,
-            debrid_token=debrid_token,
+        asyncio.create_task(
+            get_stream_link(
+                torrent=torrent,
+                season_episode=season_episode,
+                debrid_token=debrid_token,
+            )
         )
         for torrent in torrents
     ]
-    return [r for r in await asyncio.gather(*tasks) if r]
+
+    for task in asyncio.as_completed(tasks, timeout=timeout):
+        link: Optional[StreamLink] = await task
+        if link:
+            links[link.url] = link
+            if len(links) >= max_results:
+                break
+
+    # Cancel remaining tasks
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+
+    return list(links.values())

@@ -4,15 +4,17 @@ import uuid
 from base64 import b64decode
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Callable, Optional
+from enum import Enum
+from typing import Annotated, Any, Callable, Optional
 
 import structlog
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Path, Request
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ValidationError
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-from annatar import api, logging
-from annatar.debrid.providers import DebridService, get_provider
+from annatar import api, jackett, logging, web
+from annatar.debrid.providers import DebridService, get_provider, list_providers
 from annatar.stremio import StreamResponse
 
 logging.init()
@@ -64,14 +66,36 @@ async def get_manifest() -> dict[str, Any]:
         "icon": "https://i.imgur.com/p4V821B.png",
         "version": "0.1.0",
         "catalogs": [],
+        "idPrefixes": ["tt"],
         "resources": ["stream"],
         "types": ["movie", "series"],
         "name": "Annatar",
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
             "configurable": "true",
+            "configurationRequired": "true",
         },
     }
+
+
+@app.get(
+    "/api/form_config.json",
+    response_model=web.FormConfig,
+    response_model_exclude_none=False,
+)
+async def get_config() -> web.FormConfig:
+    return web.FormConfig(
+        availableIndexers=await jackett.get_indexers(),
+        availableDebridProviders=list_providers(),
+    )
+
+
+class MediaType(str, Enum):
+    movie = "movie"
+    series = "series"
+
+    def __str__(self):
+        return self.value
 
 
 @app.get(
@@ -80,20 +104,10 @@ async def get_manifest() -> dict[str, Any]:
     response_model_exclude_none=True,
 )
 async def search(
-    type: str,
-    id: str,
-    b64config: str = "e30K",  # base64 encoded json parameter {}
+    type: MediaType,
+    id: Annotated[str, Path(title="imdb ID", example="tt8927938", regex=r"tt\d+")],
+    b64config: Annotated[str, Path(description="base64 encoded json blob")],
 ) -> StreamResponse:
-    if type not in ["movie", "series"]:
-        raise HTTPException(
-            status_code=400, detail="Invalid type. Valid types are movie and series"
-        )
-    if not id.startswith("tt"):
-        raise HTTPException(status_code=400, detail="Invalid id. Id must be an IMDB id with tt")
-
-    if not b64config:
-        raise HTTPException(status_code=400, detail="Missing config")
-
     config: AppConfig = parse_config(b64config)
     debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
     if not debrid:
@@ -121,6 +135,11 @@ class AppConfig(BaseModel):
 def parse_config(b64config: str) -> AppConfig:
     try:
         return AppConfig(**json.loads(b64decode(b64config)))
+    except ValidationError as e:
+        log.warning("error decoding config", error=e, errro_type=type(e).__name__)
+        raise RequestValidationError(
+            errors=e.errors(include_url=False, include_input=False),
+        )
     except Exception as e:
-        log.warning("error decoding config", error=e)
-        raise HTTPException(status_code=400, detail=str(e))
+        log.error("Unrecognized error", error=e)
+        raise HTTPException(status_code=500, detail="Internal server error")

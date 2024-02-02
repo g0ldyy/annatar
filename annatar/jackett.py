@@ -7,23 +7,15 @@ import structlog
 
 from annatar import human
 from annatar.debrid import magnet
-from annatar.jackett_models import SearchQuery, SearchResult
+from annatar.jackett_models import Indexer, SearchQuery, SearchResult
 from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
-# TODO: need to gather these from jackett on startup or take this as an env var
-# and then verify on startup. Jackett will accept incorrect values though and
-# just return no results
-ALL_INDEXERS: list[str] = [
-    "yts",
-    "eztv",
-    "kickasstorrents-ws",
-    "thepiratebay",
-    "therarbg",
-    "torrentgalaxy",
-]
+
+async def get_indexers() -> list[Indexer]:
+    return Indexer.all()
 
 
 @timestamped(["indexer", "imdb"])
@@ -124,7 +116,7 @@ async def search_indexer(
     return prioritized_list
 
 
-@timestamped(["imdb"])
+@timestamped(["imdb", "jackett_url", "search_query", "max_results", "indexers"])
 async def search_indexers(
     search_query: SearchQuery,
     jackett_url: str,
@@ -132,7 +124,7 @@ async def search_indexers(
     max_results: int,
     imdb: int | None = None,
     timeout: int = 60,
-    indexers: list[str] = ALL_INDEXERS,
+    indexers: list[Indexer] = Indexer.all(),
 ) -> list[Torrent]:
     log.info("searching indexers", indexers=indexers)
     torrents: dict[str, Torrent] = {}
@@ -145,7 +137,7 @@ async def search_indexers(
                 jackett_api_key=jackett_api_key,
                 imdb=imdb,
                 timeout=timeout / 5,
-                indexer=indexer,
+                indexer=indexer.id,
             )
         )
         for indexer in indexers

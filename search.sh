@@ -4,7 +4,7 @@ set -ueo pipefail
 kind=${1:-}
 term=${2:-}
 provider=${3:-premiumize}
-max_results=5
+max_results=2
 
 if [ -z "${kind}" ] || [ -z "${term}" ]; then
 	echo "Usage: $0 <kind> <term> [provider]"
@@ -29,5 +29,9 @@ config=$(cat <<-EOF | jq -c . | base64 -w0
 EOF
 )
 
-http -vv --timeout 60 \
-	":8000/${config}/stream/${kind}/${term}.json"
+echo "${term}" \
+	| tr ',' '\n' \
+	| xargs -n1 -I{} -P8 \
+		http --timeout 60 \
+			GET \
+			":8000/${config}/stream/${kind}/{}.json"

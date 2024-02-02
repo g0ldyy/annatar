@@ -45,6 +45,14 @@ async def get_media_info(id: str, type: str) -> MediaInfo | None:
                 )
                 return None
             response_json = await response.json()
-            meta = response_json["meta"]
+            meta = response_json.get("meta", None)
+            if not meta:
+                log.info(
+                    "meta field is missing from response_json. Probably no results",
+                    api_url=api_url,
+                    response_json=response_json,
+                )
+                return None
+
             media_info = MediaInfo(**meta)
             return media_info

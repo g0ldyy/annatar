@@ -4,6 +4,46 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class ListIndexersResponse(BaseModel):
+    pass
+
+
+class Indexer(BaseModel):
+    id: str
+    name: str
+
+    @staticmethod
+    def find_by_name(name: str) -> Optional["Indexer"]:
+        for indexer in ALL_INDEXERS:
+            if indexer.name == name:
+                return indexer
+        return None
+
+    @staticmethod
+    def find_by_id(id: str) -> Optional["Indexer"]:
+        for indexer in ALL_INDEXERS:
+            if indexer.id == id:
+                return indexer
+        return None
+
+    @staticmethod
+    def all() -> List["Indexer"]:
+        return ALL_INDEXERS
+
+
+# TODO: need to gather these from jackett on startup or take this as an env var
+# and then verify on startup. Jackett will accept incorrect values though and
+# just return no results
+ALL_INDEXERS: list[Indexer] = [
+    Indexer(name="YTS", id="yts"),
+    Indexer(name="EZTV", id="eztv"),
+    Indexer(name="Kickass Torrents", id="kickasstorrents-ws"),
+    Indexer(name="The Pirate Bay", id="thepiratebay"),
+    Indexer(name="RARBG", id="therarbg"),
+    Indexer(name="Torrent Galaxy", id="torrentgalaxy"),
+]
+
+
 class SearchQuery(BaseModel):
     name: str
     type: str
