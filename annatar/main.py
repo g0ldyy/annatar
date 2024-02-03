@@ -58,6 +58,17 @@ async def http_mw(request: Request, call_next: Callable[[Request], Any]):
     )
     return response
 
+class MediaType(str, Enum):
+    movie = "movie"
+    series = "series"
+
+    def __str__(self):
+        return self.value
+
+    @staticmethod
+    def all() -> list[str]:
+        return [media_type.value for media_type in MediaType]
+
 
 @app.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
@@ -68,7 +79,7 @@ async def get_manifest() -> dict[str, Any]:
         "catalogs": [],
         "idPrefixes": ["tt"],
         "resources": ["stream"],
-        "types": ["movie", "series"],
+        "types": MediaType.all(),
         "name": "Annatar",
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
@@ -88,14 +99,6 @@ async def get_config() -> web.FormConfig:
         availableIndexers=await jackett.get_indexers(),
         availableDebridProviders=list_providers(),
     )
-
-
-class MediaType(str, Enum):
-    movie = "movie"
-    series = "series"
-
-    def __str__(self):
-        return self.value
 
 
 @app.get(
