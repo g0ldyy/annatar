@@ -59,7 +59,10 @@ async def select_biggest_file(
 
 
 @timestamped()
-async def add_link(magnet_link: str, debrid_token: str) -> str | None:
+async def add_magnet(magnet_link: str, debrid_token: str) -> str | None:
+    """
+    Adds a magnet link to RD and returns the torrent id.
+    """
     api_url = f"{ROOT_URL}/torrents/addMagnet"
     body = {"magnet": magnet_link}
 
@@ -232,7 +235,9 @@ async def get_stream_link(
         if not cached_files:
             return None
 
-        torrent_id = await add_link(magnet_link=torrent.url, debrid_token=debrid_token)
+        torrent_id: str | None = await add_magnet(
+            magnet_link=torrent.url, debrid_token=debrid_token
+        )
         if not torrent_id:
             log.info("no torrent id found")
             return None
@@ -262,6 +267,7 @@ async def get_stream_link(
         if not unrestricted_link:
             log.info("no unrestrict link found")
             return None
+
         return StreamLink(
             size=unrestricted_link.filesize,
             name=unrestricted_link.filename,
