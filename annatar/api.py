@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 import structlog
 
@@ -7,7 +8,7 @@ from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.jackett_models import SearchQuery
 from annatar.logging import timestamped
-from annatar.meta.cinemeta import CinemetaAPI, MediaInfo
+from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
 from annatar.torrent import Torrent
 
@@ -24,9 +25,9 @@ async def search(
     imdb_id: str,
     season_episode: list[int] = [],
 ) -> StreamResponse:
-    media_info: MediaInfo | None = await CinemetaAPI().get_media_info(id=imdb_id, type=type)
+    media_info: Optional[MediaInfo] = await get_media_info(id=imdb_id, type=type)
     if not media_info:
-        log.error("error getting media info", type=type, id=id)
+        log.error("error getting media info", type=type, id=imdb_id)
         return StreamResponse(streams=[], error="Error getting media info")
     log.info("found media info", type=type, id=id, media_info=media_info.model_dump())
 

@@ -4,6 +4,8 @@ import aiohttp
 import structlog
 from pydantic import BaseModel
 
+from annatar.cache import CACHE
+
 log = structlog.get_logger(__name__)
 
 
@@ -58,9 +60,22 @@ async def _get_media_info(id: str, type: str) -> MediaInfo | None:
             return media_info
 
 
-class CinemetaAPI(BaseModel):
-    # cache: Cache
+async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
+    cache_key = f"cinemeta:{type}:{id}"
 
-    async def get_media_info(self, id: str, type: str) -> MediaInfo | None:
-        # TODO: add caching
-        return await _get_media_info(id=id, type=type)
+    cached_result: Optional[str] = await CACHE.get(cache_key)
+    if cached_result:
+        log.info("cache hit", key=cache_key)
+        return MediaInfo.parse_raw(cached_result)
+
+    log.info("cache miss", key=cache_key)
+    res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
+    if res is None:
+        return None
+
+    await CACHE.set(
+        cache_key,
+        res.model_dump_json(),
+        ttl_seconds=60 * 60 * 24,
+    )
+    return res
