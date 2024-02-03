@@ -71,7 +71,14 @@ async def get_config() -> web.FormConfig:
 )
 async def search(
     type: MediaType,
-    id: Annotated[str, Path(title="imdb ID", example="tt8927938", regex=r"tt\d+")],
+    id: Annotated[
+        str,
+        Path(
+            title="imdb ID",
+            examples=["tt8927938", "tt0108778:5:8"],
+            regex=r"tt\d+(:\d:\d)?",
+        ),
+    ],
     b64config: Annotated[str, Path(description="base64 encoded json blob")],
 ) -> StreamResponse:
     config: AppConfig = parse_config(b64config)
