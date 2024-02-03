@@ -32,7 +32,7 @@ class MediaInfo(BaseModel):
     website: Optional[str] = None
 
 
-async def get_media_info(id: str, type: str) -> MediaInfo | None:
+async def _get_media_info(id: str, type: str) -> MediaInfo | None:
     async with aiohttp.ClientSession() as session:
         api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
         async with session.get(api_url) as response:
@@ -56,3 +56,11 @@ async def get_media_info(id: str, type: str) -> MediaInfo | None:
 
             media_info = MediaInfo(**meta)
             return media_info
+
+
+class CinemetaAPI(BaseModel):
+    # cache: Cache
+
+    async def get_media_info(self, id: str, type: str) -> MediaInfo | None:
+        # TODO: add caching
+        return await _get_media_info(id=id, type=type)
