@@ -37,7 +37,8 @@ class RedisCache(Cache):
 
     @staticmethod
     def from_env() -> Optional["RedisCache"]:
-        if "REDIS_URL" in os.environ:
+        redis_url: Optional[str] = os.environ.get("REDIS_URL")
+        if redis_url:
             return RedisCache(
                 url=os.environ.get("REDIS_URL", ""),
             )
