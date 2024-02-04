@@ -28,22 +28,23 @@ class TorrentFile(BaseModel):
 
 
 class TorrentInfo(BaseModel):
-    id: str
-    filename: str
-    original_filename: str
-    hash: str
-    bytes: int
-    original_bytes: int
-    host: str
-    split: int
-    progress: int
-    status: str
     added: str
-    files: list[TorrentFile]
+    bytes: int
+    filename: str
+    hash: str
+    host: str
+    id: str
     links: list[str]
+    progress: int
+    split: int
+    status: str
+
     ended: Optional[str] = None
-    speed: Optional[int] = None
+    files: Optional[list[TorrentFile]] = None
+    original_bytes: Optional[int] = None
+    original_filename: Optional[str] = None
     seeders: Optional[int] = None
+    speed: Optional[int] = None
 
 
 class UnrestrictedLink(BaseModel):
