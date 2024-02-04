@@ -1,5 +1,6 @@
 import os
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import Optional
 
 import redis.asyncio as redis
@@ -13,7 +14,7 @@ class Cache(ABC):
         return self.__class__.__name__
 
     @abstractmethod
-    async def set(self, key: str, value: str, ttl_seconds: int) -> bool:
+    async def set(self, key: str, value: str, ttl: timedelta) -> bool:
         log.debug("SET cache", cacher=self.name(), key=key)
         pass
 
@@ -24,7 +25,7 @@ class Cache(ABC):
 
 
 class NoCache(Cache):
-    async def set(self, key: str, value: str, ttl_seconds: int) -> bool:
+    async def set(self, key: str, value: str, ttl: timedelta) -> bool:
         return True
 
     async def get(self, key: str) -> Optional[str]:
@@ -58,22 +59,27 @@ class RedisCache(Cache):
         await client.aclose()
         return res  # type: ignore
 
-    async def set(self, key: str, value: str, ttl_seconds: int = 60 * 60) -> bool:
+    async def set(self, key: str, value: str, ttl: timedelta) -> bool:
         client: redis.Redis = redis.Redis.from_pool(self.pool)
         try:
-            return await client.set(key, value, ex=ttl_seconds)  # type: ignore
-        finally:
+            return await client.set(key, value, ex=int(ttl.total_seconds()))  # type: ignore
             await client.aclose()
+        except Exception as e:
+            log.error("failed to set cache", key=key, error=str(e))
+            return False
 
     async def get(self, key: str) -> Optional[str]:
         client: redis.Redis = redis.Redis.from_pool(self.pool)
         try:
             res: Optional[str] = await client.get(key)  # type: ignore
             if res is None:
+                log.debug("cache miss", key=key)
                 return None
+            log.debug("cache hit", key=key)
             return str(res)  # type: ignore
-        finally:
-            await client.aclose()
+        except Exception as e:
+            log.error("failed to get cache", key=key, error=str(e))
+            return None
 
 
 CACHE: Cache = RedisCache.from_env() or NoCache()

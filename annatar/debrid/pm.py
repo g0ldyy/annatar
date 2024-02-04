@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+from datetime import timedelta
 from os import getenv
 from typing import Generic, Optional, Tuple, Type, TypeVar
 
@@ -10,41 +11,15 @@ from pydantic import BaseModel
 from structlog.contextvars import bind_contextvars
 
 from annatar import human
+from annatar.cache import CACHE
 from annatar.debrid import magnet
+from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
 from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
-
-ROOT_URL = "https://www.premiumize.me/api"
-
-T = TypeVar("T", bound=BaseModel)
-
-
-@timestamped(["url", "method"])
-async def make_request(
-    api_token: str,
-    url: str,
-    method: str,
-    model: Type[T],
-    params: dict[str, str] = {},
-    headers: dict[str, str] = {},
-    data: Optional[dict[str, str]] = None,
-) -> Tuple[T, aiohttp.ClientResponse]:
-    full_url: str = f"{ROOT_URL}{url}"
-    async with aiohttp.ClientSession() as session:
-        params["apikey"] = api_token
-        async with session.request(
-            method=method,
-            url=full_url,
-            params=params,
-            data=data,
-            headers=headers,
-        ) as response:
-            raw: dict = await response.json()
-            return model.model_validate(raw), response
 
 
 async def select_stream_file(
@@ -62,7 +37,7 @@ async def select_stream_file(
     for file in sorted_files:
         path = file.path.split("/")[-1].lower()
         if human.match_season_episode(season_episode=season_episode, file=path):
-            log.info("path matches season and episode", path=path, season_episode=season_episode)
+            log.debug("path matches season and episode", path=path, season_episode=season_episode)
             return StreamLink(name=file.path.split("/")[-1], size=file.size, url=file.link)
     log.info("no file found for season and episode", season_episode=season_episode)
     return None
@@ -79,23 +54,27 @@ async def get_stream_link(
         log.error("magnet is not a valid magnet link", magnet_link=magnet_link)
         return None
 
-    dl, res = await make_request(
-        api_token=debrid_token,
-        method="POST",
-        model=DirectDLResponse,
-        url="/transfer/directdl",
-        data={"src": magnet_link},
-    )
-    if res.status not in range(200, 299):
-        log.error(
-            "failed to lookup cache", info_hash=info_hash, status=res.status, body=await res.text()
+    cache_key: str = f"pm:torrent:magnet:{info_hash}:directdl"
+    cached: Optional[str] = await CACHE.get(cache_key)
+    if cached:
+        dl: DirectDLResponse = DirectDLResponse.model_validate_json(cached)
+    else:
+        dl: DirectDLResponse = await api.directdl(
+            magnet_link=magnet_link,
+            api_token=debrid_token,
+            info_hash=info_hash,
         )
-        return None
 
     if not dl.content:
         log.info("magnet has no cached content", info_hash=info_hash)
         return None
 
+    await CACHE.set(
+        key=cache_key,
+        value=dl.model_dump_json(),
+        # cache for shorter time if there is no content
+        ttl=timedelta(days=1) if dl.content else timedelta(minutes=15),
+    )
     return await select_stream_file(dl.content, season_episode)
 
 

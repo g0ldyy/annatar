@@ -33,7 +33,7 @@ async def search_indexer(
     suffix: str = (
         f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
         if search_query.type == "series"
-        else search_query.year or ""
+        else str(search_query.year)
     )
     params: dict[str, Any] = {
         "apikey": jackett_api_key,
@@ -108,9 +108,17 @@ async def search_indexer(
             task.cancel()
 
     # prioritize items by quality
-    prioritized_list: list[Torrent] = sorted(
-        list(torrents.values()),
-        key=lambda t: human.sort_priority(search_query.name, t.title),
+    prioritized_list: list[Torrent] = list(
+        reversed(
+            sorted(
+                list(torrents.values()),
+                key=lambda t: human.score_name(
+                    search_query.name,
+                    search_query.year,
+                    t.title,
+                ),
+            )
+        )
     )
 
     return prioritized_list

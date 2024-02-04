@@ -47,7 +47,7 @@ ALL_INDEXERS: list[Indexer] = [
 class SearchQuery(BaseModel):
     name: str
     type: str
-    year: Optional[str] = None
+    year: int
     season: Optional[str] = None
     episode: Optional[str] = None
 

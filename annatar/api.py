@@ -4,7 +4,6 @@ from typing import Optional
 import structlog
 
 from annatar import human, jackett
-from annatar.cache import CACHE
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.jackett_models import SearchQuery
@@ -25,27 +24,15 @@ async def search(
     imdb_id: str,
     season_episode: list[int] = [],
 ) -> StreamResponse:
-    imdb_key: str = (
-        imdb_id if type == "movie" else f"{imdb_id}:{season_episode[0]}:{season_episode[1]}"
+    return await _search(
+        type=type,
+        max_results=max_results,
+        jackett_url=jackett_url,
+        jackett_api_key=jackett_api_key,
+        debrid=debrid,
+        imdb_id=imdb_id,
+        season_episode=season_episode,
     )
-    cache_key: str = f"api:search:{type}:{imdb_key}:{debrid}"
-    cached_results: Optional[str] = await CACHE.get(cache_key)
-    if cached_results is not None:
-        log.info("cache hit", key=cache_key)
-        return StreamResponse.model_validate_json(cached_results)
-    else:
-        log.info("cache miss", key=cache_key)
-        res: StreamResponse = await _search(
-            type=type,
-            max_results=max_results,
-            jackett_url=jackett_url,
-            jackett_api_key=jackett_api_key,
-            debrid=debrid,
-            imdb_id=imdb_id,
-            season_episode=season_episode,
-        )
-        await CACHE.set(cache_key, res.model_dump_json(), ttl_seconds=60 * 60)
-        return res
 
 
 @timestamped(["max_results", "jackett_url", "debrid", "imdb_id", "season_episode"])
@@ -67,7 +54,7 @@ async def _search(
     q = SearchQuery(
         name=media_info.name,
         type=type,
-        year=re.split(r"\D", (media_info.releaseInfo or ""))[0],
+        year=int(re.split(r"\D", (media_info.releaseInfo or ""))[0]),
     )
 
     if type == "series" and len(season_episode) == 2:
@@ -89,9 +76,13 @@ async def _search(
         max_results=max_results,
     )
 
-    sorted_links: list[StreamLink] = sorted(
-        links,
-        key=lambda x: human.sort_priority(q.name, x.name),
+    sorted_links: list[StreamLink] = list(
+        reversed(
+            sorted(
+                links,
+                key=lambda x: human.score_name(q.name, q.year, x.name),
+            )
+        )
     )
 
     streams: list[Stream] = [

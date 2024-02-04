@@ -18,6 +18,8 @@ redis = "^5.0.1"
 black = "^24.1.0"
 isort = "^5.13.2"
 pyright = "^1.1.348"
+pytest = "^8.0.0"
+pytest-watch = "^4.2.0"
 
 [build-system]
 requires = ["poetry-core"]

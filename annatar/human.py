@@ -1,7 +1,6 @@
 import re
 
 import structlog
-from structlog.contextvars import bound_contextvars
 
 log = structlog.get_logger(__name__)
 
@@ -36,29 +35,27 @@ def match_season_episode(season_episode: list[int], file: str) -> bool:
 
 
 # sort items by quality
-def sort_priority(query: str, name: str) -> int:
+def score_name(query: str, year: int, name: str) -> int:
     """
     Sort items by quality and how well they match the query pattern
     :param query: original search quality
     :param name: result name
     """
 
+    score: int = 0
     name_pattern: str = re.sub(r"\W+", r"\\W+", query)
-    with bound_contextvars(
+    if re.search(name_pattern, name, re.IGNORECASE):
+        score += 100
+    if re.search(rf"\W{year}\W", name):
+        score += 20
+    for index, quality in enumerate(reversed(PRIORITY_WORDS)):
+        if re.search(quality, name, re.IGNORECASE):
+            score += index * 5
+            break
+    log.debug(
+        "torrent score set",
         search_query=query,
         name_pattern=name_pattern,
-    ):
-        log.debug("set torrent priority")
-
-        priority: int = 50
-        reason: str = "no priority matches"
-        for index, quality in enumerate(PRIORITY_WORDS):
-            if re.search(quality, name, re.IGNORECASE):
-                if re.search(name_pattern, name, re.IGNORECASE):
-                    priority = index
-                    reason = f"matched {quality} and name"
-                else:
-                    priority = index + 10
-                    reason = f"matched {quality}, mismatch name"
-        log.debug("torrent priority set", priority=priority, reason=reason)
-        return priority
+        score=score,
+    )
+    return score

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Optional
 
 import aiohttp
@@ -5,6 +6,7 @@ import structlog
 from pydantic import BaseModel
 
 from annatar.cache import CACHE
+from annatar.logging import timestamped
 
 log = structlog.get_logger(__name__)
 
@@ -34,6 +36,7 @@ class MediaInfo(BaseModel):
     website: Optional[str] = None
 
 
+@timestamped(["id", "type"])
 async def _get_media_info(id: str, type: str) -> MediaInfo | None:
     async with aiohttp.ClientSession() as session:
         api_url = f"https://v3-cinemeta.strem.io/meta/{type}/{id}.json"
@@ -65,10 +68,8 @@ async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
 
     cached_result: Optional[str] = await CACHE.get(cache_key)
     if cached_result:
-        log.info("cache hit", key=cache_key)
-        return MediaInfo.parse_raw(cached_result)
+        return MediaInfo.model_validate_json(cached_result)
 
-    log.info("cache miss", key=cache_key)
     res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
     if res is None:
         return None
@@ -76,6 +77,6 @@ async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
     await CACHE.set(
         cache_key,
         res.model_dump_json(),
-        ttl_seconds=60 * 60 * 24,
+        ttl=timedelta(hours=3),
     )
     return res
