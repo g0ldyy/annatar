@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from structlog.contextvars import bind_contextvars
 
 from annatar import human
-from annatar.cache import CACHE
 from annatar.debrid import magnet
 from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
@@ -54,27 +53,16 @@ async def get_stream_link(
         log.error("magnet is not a valid magnet link", magnet_link=magnet_link)
         return None
 
-    cache_key: str = f"pm:torrent:magnet:{info_hash}:directdl"
-    cached: Optional[str] = await CACHE.get(cache_key)
-    if cached:
-        dl: DirectDLResponse = DirectDLResponse.model_validate_json(cached)
-    else:
-        dl: DirectDLResponse = await api.directdl(
-            magnet_link=magnet_link,
-            api_token=debrid_token,
-            info_hash=info_hash,
-        )
+    dl: Optional[DirectDLResponse] = await api.directdl(
+        magnet_link=magnet_link,
+        api_token=debrid_token,
+        info_hash=info_hash,
+    )
 
-    if not dl.content:
+    if not dl or not dl.content:
         log.info("magnet has no cached content", info_hash=info_hash)
         return None
 
-    await CACHE.set(
-        key=cache_key,
-        value=dl.model_dump_json(),
-        # cache for shorter time if there is no content
-        ttl=timedelta(days=1) if dl.content else timedelta(minutes=15),
-    )
     return await select_stream_file(dl.content, season_episode)
 
 

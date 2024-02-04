@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from structlog.contextvars import bind_contextvars
 
 from annatar import human
+from annatar.cache import CACHE
 from annatar.debrid import magnet
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
@@ -65,6 +66,11 @@ async def directdl(
     api_token: str,
     info_hash: str,
 ) -> Optional[DirectDLResponse]:
+    cache_key: str = f"premiumize:directdl:{info_hash}"
+    cached: Optional[str] = await CACHE.get(cache_key)
+    if cached:
+        return DirectDLResponse.model_validate_json(cached)
+
     dl_res: HTTPResponse[DirectDLResponse] = await make_request(
         api_token=api_token,
         method="POST",
@@ -80,13 +86,5 @@ async def directdl(
             body=await dl_res.response.text(),
         )
         return None
-
-    if dl_res.model.status != "success":
-        log.error(
-            "failed to lookup cache",
-            info_hash=info_hash,
-            status=dl_res.response.status,
-            body=await dl_res.response.text(),
-        )
-        return None
+    await CACHE.set(key=cache_key, value=dl_res.model.model_dump_json(), ttl=timedelta(days=1))
     return dl_res.model
