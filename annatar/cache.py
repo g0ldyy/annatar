@@ -5,7 +5,7 @@ from typing import Optional, Type, TypeVar
 
 import redis.asyncio as redis
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from annatar.logging import timestamped
 
@@ -82,7 +82,13 @@ class RedisCache(Cache):
         res: Optional[str] = await self.get(key)
         if res is None:
             return None
-        return model.model_validate_json(res)
+        try:
+            return model.model_validate_json(res)
+        except ValidationError as e:
+            log.error(
+                "failed to validate model", key=key, model=model.__name__, json=res, error=str(e)
+            )
+            return None
 
     async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
         return await self.set(key, model.model_dump_json(), ttl=ttl)

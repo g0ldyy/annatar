@@ -176,7 +176,7 @@ async def get_stream_for_torrent(
     Get the stream link for a torrent and file.
     """
     cache_key: str = f"torrent:{info_hash}:{file_id}"
-    cached_stream: Optional[StreamLink] = await CACHE.get_model(cache_key, model=type(StreamLink))
+    cached_stream: Optional[StreamLink] = await CACHE.get_model(cache_key, model=StreamLink)
     if cached_stream:
         log.info("Cached stream found", stream=cached_stream)
         return cached_stream
@@ -190,12 +190,13 @@ async def get_stream_for_torrent(
         log.info("No unrestricted link found")
         return None
 
-    await CACHE.set_model(cache_key, unrestricted_link, ttl=timedelta(weeks=1))
-    return StreamLink(
+    sl: StreamLink = StreamLink(
         size=unrestricted_link.filesize,
         name=unrestricted_link.filename,
         url=unrestricted_link.download,
     )
+    await CACHE.set_model(cache_key, sl, ttl=timedelta(weeks=1))
+    return sl
 
 
 @timestamped()

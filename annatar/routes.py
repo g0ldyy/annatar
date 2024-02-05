@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Path, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ValidationError
+from starlette.status import HTTP_302_FOUND
 
 from annatar import api, jackett, web
 from annatar.debrid.models import StreamLink
@@ -90,7 +91,7 @@ async def get_rd_stream(
     if not stream:
         raise HTTPException(status_code=404, detail="No stream found")
 
-    return RedirectResponse(url=stream.url)
+    return RedirectResponse(url=stream.url, status_code=HTTP_302_FOUND)
 
 
 @router.get(
