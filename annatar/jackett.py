@@ -24,6 +24,21 @@ async def get_indexers() -> list[Indexer]:
     return Indexer.all()
 
 
+@timestamped()
+async def cache_torrents(torrents: list[Torrent]) -> None:
+    tasks = [
+        asyncio.create_task(
+            CACHE.set(
+                f"torrent:{torrent.info_hash}",
+                torrent.model_dump_json(),
+                ttl=timedelta(weeks=52),
+            )
+        )
+        for torrent in torrents
+    ]
+    await asyncio.gather(*tasks)
+
+
 @timestamped(["indexer", "imdb"])
 async def search_indexer(
     search_query: SearchQuery,
@@ -53,6 +68,7 @@ async def search_indexer(
         json.dumps([r.model_dump() for r in res]),
         ttl=timedelta(hours=1),
     )
+    await cache_torrents(res)
 
     return res
 

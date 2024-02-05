@@ -1,12 +1,17 @@
 import os
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, TypeVar
 
 import redis.asyncio as redis
 import structlog
+from pydantic import BaseModel
+
+from annatar.logging import timestamped
 
 log = structlog.get_logger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class Cache(ABC):
@@ -16,6 +21,14 @@ class Cache(ABC):
     @abstractmethod
     async def set(self, key: str, value: str, ttl: timedelta) -> bool:
         log.debug("SET cache", cacher=self.name(), key=key)
+        pass
+
+    @abstractmethod
+    async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
+        pass
+
+    @abstractmethod
+    async def get_model(self, key: str, model: T) -> Optional[T]:
         pass
 
     @abstractmethod
@@ -29,6 +42,12 @@ class NoCache(Cache):
         return True
 
     async def get(self, key: str) -> Optional[str]:
+        return None
+
+    async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
+        return True
+
+    async def get_model(self, key: str, model: T) -> Optional[T]:
         return None
 
 
@@ -59,6 +78,16 @@ class RedisCache(Cache):
         await client.aclose()
         return res  # type: ignore
 
+    async def get_model(self, key: str, model: T) -> Optional[T]:
+        res: Optional[str] = await self.get(key)  # type: ignore
+        if res is None:
+            return None
+        return model.validate_json(res)  # type: ignore
+
+    async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
+        return await self.set(key, model.model_dump_json(), ttl=ttl)
+
+    @timestamped(["key"])
     async def set(self, key: str, value: str, ttl: timedelta) -> bool:
         client: redis.Redis = redis.Redis.from_pool(self.pool)
         try:
@@ -68,6 +97,7 @@ class RedisCache(Cache):
             log.error("failed to set cache", key=key, error=str(e))
             return False
 
+    @timestamped(["key"])
     async def get(self, key: str) -> Optional[str]:
         client: redis.Redis = redis.Redis.from_pool(self.pool)
         try:

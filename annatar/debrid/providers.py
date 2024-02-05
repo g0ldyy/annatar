@@ -42,6 +42,18 @@ class RealDebridProvider(DebridService):
             max_results=max_results,
         )
 
+    async def get_stream_for_torrent(
+        self,
+        info_hash: str,
+        file_id: str,
+        debrid_token: str,
+    ) -> Optional[StreamLink]:
+        return rd.get_stream_for_torrent(
+            info_hash=info_hash,
+            file_id=file_id,
+            debrid_token=debrid_token,
+        )
+
 
 class PremiumizeProvider(DebridService):
     def __str__(self) -> str:

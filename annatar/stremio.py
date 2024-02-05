@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class Stream(BaseModel):
-    name: str = "Jackett Debrid"
+    name: str = "Annatar"
     title: str
     url: str
 

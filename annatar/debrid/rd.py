@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import timedelta
 from os import getenv
 from typing import Optional
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 from structlog.contextvars import bound_contextvars
 
 from annatar import human
+from annatar.cache import CACHE
 from annatar.debrid import real_debrid_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.rd_models import (
@@ -60,7 +62,7 @@ async def select_biggest_file(
 
 
 @timestamped()
-async def select_torrent_file(
+async def select_torrent_file_by_season_episode(
     torrent_id: str,
     debrid_token: str,
     season_episode: list[int] = [],
@@ -117,61 +119,103 @@ async def get_torrent_link(info_hash: str, debrid_token: str) -> str | None:
     return None
 
 
+async def _get_stream_for_torrent(
+    info_hash: str,
+    file_id: str,
+    debrid_token: str,
+) -> UnrestrictedLink | None:
+    torrent: Optional[Torrent] = await CACHE.get_model(f"torrent:{info_hash}", model=type(Torrent))
+    if not torrent:
+        log.error("No cached torrent not found", info_hash=info_hash)
+        return None
+
+    torrent_id: str | None = await api.add_magnet(
+        magnet_link=torrent.url, debrid_token=debrid_token
+    )
+
+    if not torrent_id:
+        log.info("no torrent id found")
+        return None
+
+    log.info("magnet added to RD", torrent_id=torrent_id)
+
+    log.info("selecting media file in torrent", torrent_id=torrent_id, file_id=file_id)
+    selected: bool = api.select_torrent_file(
+        torrent_id=torrent_id,
+        debrid_token=debrid_token,
+        file_id=file_id,
+    )
+    if selected:
+        log.info("Selected torrent file", torrent_id=torrent_id, file_id=file_id)
+    else:
+        log.error("Failed to select torrent file", torrent_id=torrent_id, file_id=file_id)
+
+    torrent_link: str | None = await get_torrent_link(
+        info_hash=torrent.info_hash,
+        debrid_token=debrid_token,
+    )
+    if not torrent_link:
+        log.info("no torrent link found")
+        return None
+
+    log.info("RD Cached links found", link=torrent_link)
+
+    unrestricted_link: UnrestrictedLink | None = await api.unrestrict_link(
+        torrent=torrent,
+        link=torrent_link,
+        debrid_token=debrid_token,
+    )
+    if not unrestricted_link:
+        log.info("no unrestrict link found")
+        return None
+
+    log.info("Unrestricted link found", link=unrestricted_link)
+
+
+@timestamped()
+async def get_stream_for_torrent(
+    info_hash: str,
+    file_id: str,
+    debrid_token: str,
+) -> Optional[StreamLink]:
+    """
+    Get the stream link for a torrent and file.
+    """
+    cache_key: str = f"torrent:{info_hash}:{file_id}"
+    cached_stream: Optional[StreamLink] = await CACHE.get_model(cache_key, model=type(StreamLink))
+    if cached_stream:
+        log.info("Cached stream found", stream=cached_stream)
+        return cached_stream
+
+    unrestricted_link: UnrestrictedLink | None = await _get_stream_for_torrent(
+        info_hash=info_hash,
+        file_id=file_id,
+        debrid_token=debrid_token,
+    )
+    if not unrestricted_link:
+        log.info("No unrestricted link found")
+        return None
+
+    await CACHE.set_model(cache_key, unrestricted_link, ttl=timedelta(weeks=1))
+    return StreamLink(
+        size=unrestricted_link.filesize,
+        name=unrestricted_link.filename,
+        url=unrestricted_link.download,
+    )
+
+
 @timestamped()
 async def get_stream_link(
     torrent: Torrent,
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
-    with bound_contextvars(
-        info_hash=torrent.info_hash,
-        kind="series" if season_episode else "movie",
-    ):
-        cached_files: list[InstantFile] = await api.get_instant_availability(
-            torrent.info_hash,
-            debrid_token,
-        )
-        if not cached_files:
-            return None
-
-        torrent_id: str | None = await api.add_magnet(
-            magnet_link=torrent.url, debrid_token=debrid_token
-        )
-        if not torrent_id:
-            log.info("no torrent id found")
-            return None
-
-        log.info("magnet added to RD")
-
-        log.info("selecting media file in torrent")
-        await select_torrent_file(
-            torrent_id=torrent_id, debrid_token=debrid_token, season_episode=season_episode
-        )
-
-        torrent_link: str | None = await get_torrent_link(
-            info_hash=torrent.info_hash,
-            debrid_token=debrid_token,
-        )
-        if not torrent_link:
-            log.info("no torrent link found")
-            return None
-
-        log.info("RD Cached links found", link=torrent_link)
-
-        unrestricted_link: UnrestrictedLink | None = await api.unrestrict_link(
-            torrent=torrent,
-            link=torrent_link,
-            debrid_token=debrid_token,
-        )
-        if not unrestricted_link:
-            log.info("no unrestrict link found")
-            return None
-
-        return StreamLink(
-            size=unrestricted_link.filesize,
-            name=unrestricted_link.filename,
-            url=unrestricted_link.download,
-        )
+    cached_files: list[InstantFile] = await api.get_instant_availability(
+        torrent.info_hash,
+        debrid_token,
+    )
+    if not cached_files:
+        return None
 
 
 @timestamped()

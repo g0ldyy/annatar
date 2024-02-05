@@ -10,7 +10,13 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 from annatar import api, jackett, web
-from annatar.debrid.providers import DebridService, get_provider, list_providers
+from annatar.debrid.models import StreamLink
+from annatar.debrid.providers import (
+    DebridService,
+    RealDebridProvider,
+    get_provider,
+    list_providers,
+)
 from annatar.stremio import StreamResponse
 
 router = APIRouter()
@@ -62,6 +68,26 @@ async def get_config() -> web.FormConfig:
         availableIndexers=await jackett.get_indexers(),
         availableDebridProviders=list_providers(),
     )
+
+
+@router.get(
+    "/{b64config:str}/rd/{info_hash:str}/{file_id:str}",
+    response_model=StreamResponse,
+    response_model_exclude_none=True,
+)
+async def get_rd_stream(
+    b64config: Annotated[str, Path(description="Base64 encoded json blob")],
+    info_hash: Annotated[str, Path(description="Torrent info hash")],
+    file_id: Annotated[str, Path(description="ID of the file in the torrent")],
+):
+    config: AppConfig = parse_config(b64config)
+    rd: RealDebridProvider = RealDebridProvider(config.debrid_api_key)
+    stream: Optional[StreamLink] = await rd.get_stream_for_torrent(
+        info_hash=info_hash,
+        file_id=file_id,
+        debrid_token=config.debrid_api_key,
+    )
+    return stream
 
 
 @router.get(
