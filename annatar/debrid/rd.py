@@ -162,7 +162,7 @@ async def _get_stream_for_torrent(
         log.info("no unrestrict link found")
         return None
 
-    log.info("Unrestricted link found", link=unrestricted_link)
+    log.info("Unrestricted link found", link=unrestricted_link.download)
     return unrestricted_link
 
 

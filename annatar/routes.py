@@ -131,7 +131,7 @@ async def search(
 
     for stream in res.streams:
         if stream.url.startswith("/"):
-            stream.url = f"{request.url.hostname}://{request.url.netloc}{stream.url}"
+            stream.url = f"{request.url.scheme}://{request.url.netloc}{stream.url}"
 
     return res
 
