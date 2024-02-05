@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Optional, TypeVar
+from typing import Optional, Type, TypeVar
 
 import redis.asyncio as redis
 import structlog
@@ -28,7 +28,7 @@ class Cache(ABC):
         pass
 
     @abstractmethod
-    async def get_model(self, key: str, model: T) -> Optional[T]:
+    async def get_model(self, key: str, model: Type[T]) -> Optional[T]:
         pass
 
     @abstractmethod
@@ -47,7 +47,7 @@ class NoCache(Cache):
     async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
         return True
 
-    async def get_model(self, key: str, model: T) -> Optional[T]:
+    async def get_model(self, key: str, model: Type[T]) -> Optional[T]:
         return None
 
 
@@ -78,11 +78,11 @@ class RedisCache(Cache):
         await client.aclose()
         return res  # type: ignore
 
-    async def get_model(self, key: str, model: T) -> Optional[T]:
-        res: Optional[str] = await self.get(key)  # type: ignore
+    async def get_model(self, key: str, model: Type[T]) -> Optional[T]:
+        res: Optional[str] = await self.get(key)
         if res is None:
             return None
-        return model.validate_json(res)  # type: ignore
+        return model.model_validate_json(res)
 
     async def set_model(self, key: str, model: BaseModel, ttl: timedelta) -> bool:
         return await self.set(key, model.model_dump_json(), ttl=ttl)

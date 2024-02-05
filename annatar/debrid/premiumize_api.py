@@ -1,22 +1,13 @@
-import asyncio
-import json
-import re
 from datetime import timedelta
-from os import getenv
-from typing import Generic, Optional, Tuple, Type, TypeVar
+from typing import Any, Generic, Optional, Type, TypeVar
 
 import aiohttp
 import structlog
 from pydantic import BaseModel
-from structlog.contextvars import bind_contextvars
 
-from annatar import human
 from annatar.cache import CACHE
-from annatar.debrid import magnet
-from annatar.debrid.models import StreamLink
-from annatar.debrid.pm_models import DirectDL, DirectDLResponse
+from annatar.debrid.pm_models import DirectDLResponse
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
@@ -55,7 +46,7 @@ async def make_request(
             data=data,
             headers=headers,
         ) as response:
-            raw: dict = await response.json()
+            raw: dict[str, Any] = await response.json()
             model_instance = model.model_validate(raw)
             return HTTPResponse(model=model_instance, response=response)
 

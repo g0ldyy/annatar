@@ -1,14 +1,7 @@
 import asyncio
-import json
-import re
-from datetime import timedelta
-from os import getenv
-from typing import Generic, Optional, Tuple, Type, TypeVar
+from typing import Optional
 
-import aiohttp
 import structlog
-from pydantic import BaseModel
-from structlog.contextvars import bind_contextvars
 
 from annatar import human
 from annatar.debrid import magnet

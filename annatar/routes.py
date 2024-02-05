@@ -5,8 +5,9 @@ from enum import Enum
 from typing import Annotated, Any, Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ValidationError
 
 from annatar import api, jackett, web
@@ -71,23 +72,25 @@ async def get_config() -> web.FormConfig:
 
 
 @router.get(
-    "/{b64config:str}/rd/{info_hash:str}/{file_id:str}",
+    "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:str}",
     response_model=StreamResponse,
     response_model_exclude_none=True,
 )
 async def get_rd_stream(
-    b64config: Annotated[str, Path(description="Base64 encoded json blob")],
+    debrid_api_key: Annotated[str, Path(description="Debrid token")],
     info_hash: Annotated[str, Path(description="Torrent info hash")],
     file_id: Annotated[str, Path(description="ID of the file in the torrent")],
-):
-    config: AppConfig = parse_config(b64config)
-    rd: RealDebridProvider = RealDebridProvider(config.debrid_api_key)
+) -> RedirectResponse:
+    rd: RealDebridProvider = RealDebridProvider(debrid_api_key)
     stream: Optional[StreamLink] = await rd.get_stream_for_torrent(
         info_hash=info_hash,
         file_id=file_id,
-        debrid_token=config.debrid_api_key,
+        debrid_token=debrid_api_key,
     )
-    return stream
+    if not stream:
+        raise HTTPException(status_code=404, detail="No stream found")
+
+    return RedirectResponse(url=stream.url)
 
 
 @router.get(
@@ -96,6 +99,7 @@ async def get_rd_stream(
     response_model_exclude_none=True,
 )
 async def search(
+    request: Request,
     type: MediaType,
     id: Annotated[
         str,
@@ -114,7 +118,7 @@ async def search(
 
     imdb_id: str = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
-    return await api.search(
+    res: StreamResponse = await api.search(
         type=type,
         debrid=debrid,
         imdb_id=imdb_id,
@@ -123,6 +127,12 @@ async def search(
         jackett_url=jackett_url,
         max_results=config.max_results,
     )
+
+    for stream in res.streams:
+        if stream.url.startswith("/"):
+            stream.url = f"{request.url.hostname}://{request.url.netloc}{stream.url}"
+
+    return res
 
 
 class AppConfig(BaseModel):

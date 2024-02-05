@@ -1,8 +1,5 @@
-import asyncio
-from os import getenv
 from typing import Optional
 
-import aiohttp
 from pydantic import BaseModel
 
 from annatar.torrent import Torrent

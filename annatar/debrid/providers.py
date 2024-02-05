@@ -48,7 +48,7 @@ class RealDebridProvider(DebridService):
         file_id: str,
         debrid_token: str,
     ) -> Optional[StreamLink]:
-        return rd.get_stream_for_torrent(
+        return await rd.get_stream_for_torrent(
             info_hash=info_hash,
             file_id=file_id,
             debrid_token=debrid_token,

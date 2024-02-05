@@ -1,22 +1,9 @@
 import asyncio
-import json
-from os import getenv
-from typing import Optional
 
 import aiohttp
 import structlog
-from pydantic import BaseModel
-from structlog.contextvars import bound_contextvars
 
-from annatar import human
-from annatar.debrid.models import StreamLink
-from annatar.debrid.rd_models import (
-    InstantFile,
-    StreamableFile,
-    TorrentFile,
-    TorrentInfo,
-    UnrestrictedLink,
-)
+from annatar.debrid.rd_models import InstantFile, TorrentInfo, UnrestrictedLink
 from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
@@ -122,21 +109,25 @@ async def select_torrent_file(
     season_episode: list[int] = [],
 ) -> bool:
     async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.post(
-            f"{ROOT_URL}/torrents/selectFiles/{torrent_id}",
-            headers=api_headers,
-            data={"files": file_id},
-        ) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error selecting torrent file",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return False
-            return True
+        for i in range(1, 5):
+            api_headers = {"Authorization": f"Bearer {debrid_token}"}
+            async with session.post(
+                f"{ROOT_URL}/torrents/selectFiles/{torrent_id}",
+                headers=api_headers,
+                data={"files": file_id},
+            ) as response:
+                if response.status not in range(200, 300):
+                    log.error(
+                        "Error selecting torrent file",
+                        status=response.status,
+                        reason=response.reason,
+                        body=await response.text(),
+                        attempt=i,
+                    )
+                    await asyncio.sleep(i)
+                return True
+    log.error("failed to select torrent file", torrent_id=torrent_id, file_id=file_id, attempts=5)
+    return False
 
 
 @timestamped()

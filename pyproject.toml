@@ -33,4 +33,8 @@ line-length = 100
 
 [tool.pyright]
 strict = ["annatar/*.py"]
-remove_redundant_aliases = true
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportUnusedVariable = true
+reportUnusedFunction = true
+reportUnusedImport = true
