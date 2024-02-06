@@ -83,7 +83,7 @@ async def _search_indexer(
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
-        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
+        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)} {search_query.year}"
         if search_query.type == "series"
         else str(search_query.year)
     )

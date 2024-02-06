@@ -3,7 +3,6 @@ name = "annatar"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -20,6 +19,7 @@ isort = "^5.13.2"
 pyright = "^1.1.348"
 pytest = "^8.0.0"
 pytest-watch = "^4.2.0"
+types-redis = "^4.6.0.20240106"
 
 [build-system]
 requires = ["poetry-core"]

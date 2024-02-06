@@ -36,6 +36,10 @@ class Cache(ABC):
         log.debug("GET cache", cacher=self.name(), key=key)
         pass
 
+    @abstractmethod
+    async def ping(self) -> bool:
+        pass
+
 
 class NoCache(Cache):
     async def set(self, key: str, value: str, ttl: timedelta) -> bool:
@@ -49,6 +53,9 @@ class NoCache(Cache):
 
     async def get_model(self, key: str, model: Type[T]) -> Optional[T]:
         return None
+
+    async def ping(self) -> bool:
+        return True
 
 
 class RedisCache(Cache):
@@ -66,17 +73,17 @@ class RedisCache(Cache):
 
     def __init__(self, url: str):
         self.url = url
-        self.pool = redis.ConnectionPool.from_url(  # type: ignore
+        self.pool: redis.ConnectionPool = redis.ConnectionPool.from_url(  # type: ignore
             url=url,
             decode_responses=True,
             max_connections=20,
         )
 
     async def ping(self) -> bool:
-        client = redis.Redis.from_pool(self.pool)
-        res = await client.ping()  # type: ignore
-        await client.aclose()
-        return res  # type: ignore
+        client = redis.Redis.from_pool(self.pool)  # type: ignore
+        res: Optional[str] = await client.ping()  # type: ignore
+        await client.aclose()  # type: ignore
+        return True if res == "PONG" else False
 
     async def get_model(self, key: str, model: Type[T]) -> Optional[T]:
         res: Optional[str] = await self.get(key)
@@ -95,7 +102,7 @@ class RedisCache(Cache):
 
     @timestamped(["key"])
     async def set(self, key: str, value: str, ttl: timedelta) -> bool:
-        client: redis.Redis = redis.Redis.from_pool(self.pool)
+        client: redis.Redis = redis.Redis.from_pool(self.pool)  # type: ignore
         try:
             return await client.set(key, value, ex=int(ttl.total_seconds()))  # type: ignore
             await client.aclose()
@@ -105,7 +112,7 @@ class RedisCache(Cache):
 
     @timestamped(["key"])
     async def get(self, key: str) -> Optional[str]:
-        client: redis.Redis = redis.Redis.from_pool(self.pool)
+        client: redis.Redis = redis.Redis.from_pool(self.pool)  # type: ignore
         try:
             res: Optional[str] = await client.get(key)  # type: ignore
             if res is None:
