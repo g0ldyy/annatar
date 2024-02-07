@@ -12,6 +12,7 @@ aiohttp = "^3.9.1"
 uvicorn = "^0.27.0"
 structlog = "^24.1.0"
 redis = "^5.0.1"
+redislite = "^6.2.912183"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.1.0"

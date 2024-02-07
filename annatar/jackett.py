@@ -8,7 +8,7 @@ import aiohttp
 import structlog
 
 from annatar import human
-from annatar.cache import CACHE
+from annatar.database import db
 from annatar.debrid import magnet
 from annatar.jackett_models import Indexer, SearchQuery, SearchResult
 from annatar.logging import timestamped
@@ -28,7 +28,7 @@ async def get_indexers() -> list[Indexer]:
 async def cache_torrents(torrents: list[Torrent]) -> None:
     tasks = [
         asyncio.create_task(
-            CACHE.set(
+            db.set(
                 f"torrent:{torrent.info_hash}",
                 torrent.model_dump_json(),
                 ttl=timedelta(weeks=52),
@@ -51,7 +51,7 @@ async def search_indexer(
     if search_query.type == "series":
         cache_key += f":{search_query.season}:{search_query.episode}"
 
-    cached_results: Optional[str] = await CACHE.get(cache_key)
+    cached_results: Optional[str] = await db.get(cache_key)
     if cached_results:
         return [Torrent.model_validate(t) for t in json.loads(cached_results)]
         return cached_results
@@ -63,7 +63,7 @@ async def search_indexer(
         indexer=indexer,
         imdb=imdb,
     )
-    await CACHE.set(
+    await db.set(
         cache_key,
         json.dumps([r.model_dump() for r in res]),
         ttl=timedelta(hours=1),
@@ -274,7 +274,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
         return link
 
     cache_key: str = f"jackett:magnet:{guid}:url"
-    cached_magnet: Optional[str] = await CACHE.get(cache_key)
+    cached_magnet: Optional[str] = await db.get(cache_key)
     if cached_magnet:
         log.debug("magnet resolved", guid=guid)
         return cached_magnet
@@ -290,7 +290,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
                 else:
                     log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
                     return None
-        await CACHE.set(cache_key, location)
+        await db.set(cache_key, location)
     except TimeoutError as err:
         log.error("magnet resolve: timeout", guid=guid, error=err)
         return None

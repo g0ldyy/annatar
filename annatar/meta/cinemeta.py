@@ -5,7 +5,7 @@ import aiohttp
 import structlog
 from pydantic import BaseModel
 
-from annatar.cache import CACHE
+from annatar.database import db
 from annatar.logging import timestamped
 
 log = structlog.get_logger(__name__)
@@ -66,15 +66,15 @@ async def _get_media_info(id: str, type: str) -> MediaInfo | None:
 async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
     cache_key = f"cinemeta:{type}:{id}"
 
-    cached_result: Optional[str] = await CACHE.get(cache_key)
+    cached_result: Optional[MediaInfo] = await db.get_model(cache_key, model=MediaInfo)
     if cached_result:
-        return MediaInfo.model_validate_json(cached_result)
+        return cached_result
 
     res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
     if res is None:
         return None
 
-    await CACHE.set(
+    await db.set(
         cache_key,
         res.model_dump_json(),
         ttl=timedelta(hours=3),

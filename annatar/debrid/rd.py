@@ -5,7 +5,7 @@ from typing import Optional
 import structlog
 
 from annatar import human
-from annatar.cache import CACHE
+from annatar.database import db
 from annatar.debrid import real_debrid_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.rd_models import (
@@ -117,7 +117,7 @@ async def _get_stream_for_torrent(
     file_id: str,
     debrid_token: str,
 ) -> Optional[UnrestrictedLink]:
-    torrent: Optional[Torrent] = await CACHE.get_model(f"torrent:{info_hash}", model=Torrent)
+    torrent: Optional[Torrent] = await db.get_model(f"torrent:{info_hash}", model=Torrent)
     if not torrent:
         log.error("No cached torrent not found", info_hash=info_hash)
         return None
@@ -176,7 +176,7 @@ async def get_stream_for_torrent(
     Get the stream link for a torrent and file.
     """
     cache_key: str = f"torrent:{info_hash}:{file_id}"
-    cached_stream: Optional[StreamLink] = await CACHE.get_model(cache_key, model=StreamLink)
+    cached_stream: Optional[StreamLink] = await db.get_model(cache_key, model=StreamLink)
     if cached_stream:
         log.info("Cached stream found", stream=cached_stream)
         return cached_stream
@@ -195,7 +195,7 @@ async def get_stream_for_torrent(
         name=unrestricted_link.filename,
         url=unrestricted_link.download,
     )
-    await CACHE.set_model(cache_key, sl, ttl=timedelta(weeks=1))
+    await db.set_model(cache_key, sl, ttl=timedelta(weeks=1))
     return sl
 
 
