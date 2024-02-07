@@ -5,12 +5,12 @@ volumes:
   jackett_config: {}
 
 services:
-  annatar:
+  web:
     build: .
     ports:
       - "8000:8000"
     depends_on:
-      # - redis
+      - redis
       - jackett
     environment:
       NUM_WORKERS: "16"
