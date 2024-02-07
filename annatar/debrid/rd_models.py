@@ -32,7 +32,7 @@ class TorrentInfo(BaseModel):
     host: str
     id: str
     links: list[str]
-    progress: int
+    progress: float
     split: int
     status: str
 
