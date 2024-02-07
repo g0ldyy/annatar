@@ -17,7 +17,7 @@ from annatar.torrent import Torrent
 log = structlog.get_logger(__name__)
 
 MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
-INDEXER_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 60))
+INDEXER_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
 
 async def get_indexers() -> list[Indexer]:
