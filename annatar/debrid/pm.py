@@ -9,7 +9,7 @@ from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
+from annatar.db.models import Torrent
 
 log = structlog.get_logger(__name__)
 

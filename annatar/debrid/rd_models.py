@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from annatar.torrent import Torrent
+from annatar.db.models import Torrent
 
 
 class InstantFile(BaseModel):

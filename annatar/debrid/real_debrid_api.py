@@ -3,9 +3,9 @@ import asyncio
 import aiohttp
 import structlog
 
+from annatar.db.models import Torrent
 from annatar.debrid.rd_models import InstantFile, TorrentInfo, UnrestrictedLink
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 

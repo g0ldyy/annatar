@@ -11,3 +11,7 @@ class Torrent(BaseModel):
     url: str
     seeders: int
     tracker: Optional[str] = ""
+
+    @property
+    def uuid(self) -> str:
+        return f"torrent:{self.info_hash}"

@@ -1,18 +1,18 @@
 import asyncio
-import json
 import os
 from datetime import timedelta
 from typing import Any, Optional
 
 import aiohttp
 import structlog
+from pydantic import BaseModel
 
 from annatar import human
-from annatar.cache import CACHE
+from annatar.db import db
+from annatar.db.models import Torrent
 from annatar.debrid import magnet
 from annatar.jackett_models import Indexer, SearchQuery, SearchResult
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
@@ -28,15 +28,19 @@ async def get_indexers() -> list[Indexer]:
 async def cache_torrents(torrents: list[Torrent]) -> None:
     tasks = [
         asyncio.create_task(
-            CACHE.set(
+            db.put(
                 f"torrent:{torrent.info_hash}",
-                torrent.model_dump_json(),
+                torrent,
                 ttl=timedelta(weeks=52),
             )
         )
         for torrent in torrents
     ]
     await asyncio.gather(*tasks)
+
+
+class Torrents(BaseModel):
+    torrents: list[Torrent]
 
 
 @timestamped(["indexer", "imdb"])
@@ -51,10 +55,9 @@ async def search_indexer(
     if search_query.type == "series":
         cache_key += f":{search_query.season}:{search_query.episode}"
 
-    cached_results: Optional[str] = await CACHE.get(cache_key)
+    cached_results: Torrents | None = await db.get(cache_key, Torrents)
     if cached_results:
-        return [Torrent.model_validate(t) for t in json.loads(cached_results)]
-        return cached_results
+        return cached_results.torrents
 
     res: list[Torrent] = await _search_indexer(
         search_query=search_query,
@@ -63,9 +66,9 @@ async def search_indexer(
         indexer=indexer,
         imdb=imdb,
     )
-    await CACHE.set(
+    await db.put(
         cache_key,
-        json.dumps([r.model_dump() for r in res]),
+        Torrents(torrents=res),
         ttl=timedelta(hours=1),
     )
     await cache_torrents(res)
@@ -274,7 +277,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
         return link
 
     cache_key: str = f"jackett:magnet:{guid}:url"
-    cached_magnet: Optional[str] = await CACHE.get(cache_key)
+    cached_magnet: Optional[str] = await db.get_str(cache_key)
     if cached_magnet:
         log.debug("magnet resolved", guid=guid)
         return cached_magnet
@@ -290,7 +293,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
                 else:
                     log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
                     return None
-        await CACHE.set(cache_key, location)
+        await db.put(cache_key, location)
     except TimeoutError as err:
         log.error("magnet resolve: timeout", guid=guid, error=err)
         return None

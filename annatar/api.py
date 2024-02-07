@@ -4,13 +4,13 @@ from typing import Optional
 import structlog
 
 from annatar import human, jackett
+from annatar.db.models import Torrent
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.jackett_models import SearchQuery
 from annatar.logging import timestamped
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
-from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
