@@ -31,7 +31,7 @@ EOF
 
 echo "${term}" \
 	| tr ',' '\n' \
-	| xargs -I{} -P8 \
+	| xargs -I{} -P17 \
 		http --timeout 60 \
 			GET \
-			":8000/${config}/stream/${kind}/{}.json"
+			"http://127.0.0.1:8000/${config}/stream/${kind}/{}.json"
