@@ -6,7 +6,7 @@ import structlog
 from annatar import human, jackett
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
-from annatar.jackett_models import SearchQuery
+from annatar.jackett_models import Indexer, SearchQuery
 from annatar.logging import timestamped
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
@@ -71,7 +71,7 @@ async def _search(
         search_query=q,
         imdb=int(imdb_id.replace("tt", "")),
         timeout=60,
-        indexers=indexers,
+        indexers=[Indexer.find_by_id(i) for i in indexers],
     )
 
     links: list[StreamLink] = await debrid.get_stream_links(

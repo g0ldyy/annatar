@@ -13,7 +13,14 @@ log = structlog.get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 DB_PATH = os.environ.get("DB_PATH", "annatar.db")
-redis = StrictRedis(DB_PATH)
+REDIS_URL = os.environ.get("REDIS_URL", "")
+redis: StrictRedis = StrictRedis(host=REDIS_URL) if REDIS_URL else StrictRedis(DB_PATH)
+
+if REDIS_URL:
+    log.info("connected to redis", host=REDIS_URL)
+    redis.ping()
+else:
+    log.info("running with local redis", storage=DB_PATH)
 
 
 async def ping() -> bool:
