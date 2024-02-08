@@ -14,7 +14,10 @@ T = TypeVar("T", bound=BaseModel)
 
 DB_PATH = os.environ.get("DB_PATH", "annatar.db")
 REDIS_URL = os.environ.get("REDIS_URL", "")
-redis: StrictRedis = StrictRedis(host=REDIS_URL) if REDIS_URL else StrictRedis(DB_PATH)
+REDIS_FLAGS = {"socket_timeout": 3.0, "socket_connect_timeout": 3.0}
+redis: StrictRedis = (
+    StrictRedis(host=REDIS_URL, **REDIS_FLAGS) if REDIS_URL else StrictRedis(DB_PATH, **REDIS_FLAGS)
+)
 
 if REDIS_URL:
     log.info("connected to redis", host=REDIS_URL)
