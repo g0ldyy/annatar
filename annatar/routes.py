@@ -1,24 +1,17 @@
-import json
 import os
-from base64 import b64decode
 from enum import Enum
 from typing import Annotated, Any, Optional
 
 import structlog
 from fastapi import APIRouter, HTTPException, Path, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, ValidationError
 from starlette.status import HTTP_302_FOUND
 
-from annatar import api, jackett, web
+from annatar import api
+from annatar.config import UserConfig, parse_config
 from annatar.debrid.models import StreamLink
-from annatar.debrid.providers import (
-    DebridService,
-    RealDebridProvider,
-    get_provider,
-    list_providers,
-)
+from annatar.debrid.providers import DebridService, get_provider
+from annatar.debrid.real_debrid_provider import RealDebridProvider
 from annatar.stremio import StreamResponse
 
 router = APIRouter()
@@ -61,18 +54,6 @@ async def get_manifest() -> dict[str, Any]:
 
 
 @router.get(
-    "/api/form_config.json",
-    response_model=web.FormConfig,
-    response_model_exclude_none=False,
-)
-async def get_config() -> web.FormConfig:
-    return web.FormConfig(
-        availableIndexers=await jackett.get_indexers(),
-        availableDebridProviders=list_providers(),
-    )
-
-
-@router.get(
     "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:str}",
     response_model=StreamResponse,
     response_model_exclude_none=True,
@@ -112,7 +93,7 @@ async def search(
     ],
     b64config: Annotated[str, Path(description="base64 encoded json blob")],
 ) -> StreamResponse:
-    config: AppConfig = parse_config(b64config)
+    config: UserConfig = parse_config(b64config)
     debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
     if not debrid:
         raise HTTPException(status_code=400, detail="Invalid debrid service")
@@ -134,22 +115,3 @@ async def search(
             stream.url = f"{request.url.scheme}://{request.url.netloc}{stream.url}"
 
     return res
-
-
-class AppConfig(BaseModel):
-    debrid_service: str
-    debrid_api_key: str
-    max_results: int = 5
-
-
-def parse_config(b64config: str) -> AppConfig:
-    try:
-        return AppConfig(**json.loads(b64decode(b64config)))
-    except ValidationError as e:
-        log.warning("error decoding config", error=e, errro_type=type(e).__name__)
-        raise RequestValidationError(
-            errors=e.errors(include_url=False, include_input=False),
-        )
-    except Exception as e:
-        log.error("Unrecognized error", error=e)
-        raise HTTPException(status_code=500, detail="Internal server error")
