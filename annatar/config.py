@@ -11,6 +11,7 @@ log = structlog.get_logger()
 class UserConfig(BaseModel):
     debrid_service: str
     debrid_api_key: str
+    indexers: list[str]
     max_results: int = 5
 
     @staticmethod
@@ -19,6 +20,7 @@ class UserConfig(BaseModel):
             debrid_service="",
             debrid_api_key="",
             max_results=5,
+            indexers=[],
         )
 
 

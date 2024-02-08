@@ -108,6 +108,7 @@ async def search(
         jackett_api_key=jackett_api_key,
         jackett_url=jackett_url,
         max_results=config.max_results,
+        indexers=config.indexers,
     )
 
     for stream in res.streams:

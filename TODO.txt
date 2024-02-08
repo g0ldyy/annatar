@@ -1,2 +1,7 @@
-- select indexers based on jackett http query during configuration
+[ ] select indexers based on jackett http query during configuration
   - make a request to '/api/v2.0/indexers' and look for any item listed as 'configured'
+    - DOES NOT WORK. This api endpoint requires basic auth and does not work with an API key
+    - Figure out how to do it anyway?
+
+[ ] use redis timeseries to keep track of api calls and metrics
+  [ ] present these on the configure page next to each indexer for the user to see when they choose them

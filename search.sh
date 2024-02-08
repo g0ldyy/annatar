@@ -24,8 +24,10 @@ config=$(cat <<-EOF | jq -c . | base64 -w0
 {
 	"debrid_service": "${provider}",
 	"debrid_api_key": "${debrid_api_key}",
-	"max_results": ${max_results}
+	"max_results": ${max_results},
+	"indexers": ["yts", "eztv", "kickasstorrents-ws", "thepiratebay", "therarbg", "torrentgalaxy"]
 }
+
 EOF
 )
 

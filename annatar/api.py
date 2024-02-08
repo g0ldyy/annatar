@@ -23,6 +23,7 @@ async def search(
     debrid: DebridService,
     imdb_id: str,
     season_episode: list[int] = [],
+    indexers: list[str] = [],
 ) -> StreamResponse:
     return await _search(
         type=type,
@@ -32,6 +33,7 @@ async def search(
         debrid=debrid,
         imdb_id=imdb_id,
         season_episode=season_episode,
+        indexers=indexers,
     )
 
 
@@ -44,6 +46,7 @@ async def _search(
     debrid: DebridService,
     imdb_id: str,
     season_episode: list[int] = [],
+    indexers: list[str] = [],
 ) -> StreamResponse:
     media_info: Optional[MediaInfo] = await get_media_info(id=imdb_id, type=type)
     if not media_info:
@@ -68,6 +71,7 @@ async def _search(
         search_query=q,
         imdb=int(imdb_id.replace("tt", "")),
         timeout=60,
+        indexers=indexers,
     )
 
     links: list[StreamLink] = await debrid.get_stream_links(

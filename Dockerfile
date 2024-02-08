@@ -37,15 +37,20 @@ FROM python:3.11-slim as final
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV DB_PATH /app/data/annatar.db
 
+VOLUME /app/data
 # Set the working directory in the container
 WORKDIR /app
 
 # Copy only the built wheel from the builder stage
 COPY --from=builder /app/dist/*.whl /app/
-
 # Install the application package
 RUN pip install *.whl && rm *.whl
+
+# Copy static website files
+COPY ./static /app/static
+COPY ./templates /app/templates
 
 COPY run.py /app/run.py
 # Your application's default command, adjust as needed

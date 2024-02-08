@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from typing import Optional, Type, TypeVar
 
@@ -11,7 +12,8 @@ log = structlog.get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-redis = StrictRedis("annatar.db")
+DB_PATH = os.environ.get("DB_PATH", "annatar.db")
+redis = StrictRedis(DB_PATH)
 
 
 async def ping() -> bool:
