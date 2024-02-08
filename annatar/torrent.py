@@ -10,4 +10,5 @@ class Torrent(BaseModel):
     title: str
     url: str
     seeders: int
-    tracker: Optional[str] = ""
+    tracker: Optional[str] = None
+    imdb: Optional[int] = None

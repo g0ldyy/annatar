@@ -11,7 +11,7 @@ if [ -z "${kind}" ] || [ -z "${term}" ]; then
 	exit 1
 fi
 
-if [ "${provider}" == "real-debrid" ]; then
+if [ "${provider}" == "real_debrid" ]; then
 	debrid_api_key=$(op read "op://Personal/Real-debrid/API Token")
 elif [ "${provider}" == "premiumize" ]; then
 	debrid_api_key=$(op read "op://Personal/Premiumize.me/API Key")

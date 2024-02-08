@@ -20,6 +20,6 @@ def list_providers() -> list[dict[str, str]]:
 
 def get_provider(provider_name: str, api_key: str) -> Optional[DebridService]:
     for p in _providers:
-        if p.name() == provider_name:
+        if p.id() == provider_name:
             return p.__class__(api_key)
     return None

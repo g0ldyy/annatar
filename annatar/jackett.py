@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import aiohttp
 import structlog
+from structlog.contextvars import bound_contextvars
 
 from annatar import human
 from annatar.database import db
@@ -54,20 +55,23 @@ async def search_indexer(
     cached_results: Optional[str] = await db.get(cache_key)
     if cached_results:
         return [Torrent.model_validate(t) for t in json.loads(cached_results)]
-        return cached_results
 
-    res: list[Torrent] = await _search_indexer(
-        search_query=search_query,
-        jackett_url=jackett_url,
-        jackett_api_key=jackett_api_key,
+    with bound_contextvars(
         indexer=indexer,
-        imdb=imdb,
-    )
-    await db.set(
-        cache_key,
-        json.dumps([r.model_dump() for r in res]),
-        ttl=timedelta(hours=1),
-    )
+        query=search_query,
+    ):
+        res: list[Torrent] = await _search_indexer(
+            search_query=search_query,
+            jackett_url=jackett_url,
+            jackett_api_key=jackett_api_key,
+            indexer=indexer,
+            imdb=imdb,
+        )
+        await db.set(
+            cache_key,
+            json.dumps([r.model_dump() for r in res]),
+            ttl=timedelta(hours=1),
+        )
     await cache_torrents(res)
 
     return res
@@ -83,7 +87,7 @@ async def _search_indexer(
     search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffix: str = (
-        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)} {search_query.year}"
+        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
         if search_query.type == "series"
         else str(search_query.year)
     )
@@ -98,7 +102,7 @@ async def _search_indexer(
         log.info(
             "searching jackett",
             query=search_query.model_dump(),
-            params=params,
+            search_params=params,
             indexer=indexer,
         )
         try:
@@ -233,6 +237,7 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
             url=result.MagnetUri,
             seeders=result.Seeders,
             tracker=result.Tracker,
+            imdb=result.Imdb,
         )
 
     if result.Link and result.Link.startswith("http"):
