@@ -1,41 +1,17 @@
-from abc import ABC, abstractmethod
 from typing import Optional
 
-from annatar.debrid.models import StreamLink
-from annatar.torrent import Torrent
+from annatar.debrid.debrid_service import DebridService
+from annatar.debrid.premiumize_provider import PremiumizeProvider
+from annatar.debrid.real_debrid_provider import RealDebridProvider
 
-_providers: list["DebridService"] = []
+_providers: list[DebridService] = [
+    RealDebridProvider(api_key=""),
+    PremiumizeProvider(api_key=""),
+]
 
 
 def register_provider(prov: "DebridService"):
     _providers.append(prov)
-
-
-class DebridService(ABC):
-    api_key: str
-
-    def __str__(self) -> str:
-        return self.__class__.__name__
-
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-
-    @abstractmethod
-    def name(self) -> str:
-        pass
-
-    @abstractmethod
-    def id(self) -> str:
-        pass
-
-    @abstractmethod
-    async def get_stream_links(
-        self,
-        torrents: list[Torrent],
-        season_episode: list[int],
-        max_results: int = 5,
-    ) -> list[StreamLink]:
-        return []
 
 
 def list_providers() -> list[dict[str, str]]:

@@ -1,8 +1,8 @@
 from typing import Optional
 
 from annatar.debrid import rd
+from annatar.debrid.debrid_service import DebridService
 from annatar.debrid.models import StreamLink
-from annatar.debrid.providers import DebridService, register_provider
 from annatar.torrent import Torrent
 
 
@@ -40,6 +40,3 @@ class RealDebridProvider(DebridService):
             file_id=file_id,
             debrid_token=debrid_token,
         )
-
-
-register_provider(RealDebridProvider(api_key=""))

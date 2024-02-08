@@ -1,6 +1,6 @@
 from annatar.debrid import pm
 from annatar.debrid.models import StreamLink
-from annatar.debrid.providers import DebridService, register_provider
+from annatar.debrid.debrid_service import DebridService
 from annatar.torrent import Torrent
 
 
@@ -26,6 +26,3 @@ class PremiumizeProvider(DebridService):
             season_episode=season_episode,
             max_results=max_results,
         )
-
-
-register_provider(PremiumizeProvider(api_key=""))

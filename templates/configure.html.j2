@@ -17,15 +17,14 @@
     <form>
         <!-- Floating Form Group for Provider -->
         <div class="form-floating mb-3">
-            <select class="form-select" id="debrid_provider" name="debrid_provider" aria-label="Provider">
+            <select class="form-select" id="debrid_provider" name="debrid_provider" aria-label="Debrid Provider">
 				{% for provider in ctx.available_debrid_providers %}
                 <option selected value="{{ provider.id }}">{{ provider.name }}</option>
 				{% endfor %}
             </select>
-            <label for="provider">Provider</label>
+            <label for="provider">Debrid Provider</label>
         </div>
 
-        <!-- Floating Form Group for API Key -->
         <div class="form-floating mb-3">
             <input type="password" class="form-control" id="debrid_api_key" name="debrid_api_key" placeholder="API Key">
             <label for="debrid_api_key">Debrid API Key</label>
@@ -34,7 +33,6 @@
         <!-- Floating Form Group for Max Results -->
         <div class="form-floating mb-3">
             <select class="form-select" id="max_results" name="max_results" aria-label="Max Results">
-                <!-- Dynamically generate or manually add options 3 to 15 -->
                 <option value="3">3</option>
                 <option selected value="5">5</option>
                 <option value="10">10</option>
@@ -51,10 +49,12 @@
                 <label class="form-check-label" for="{{ indexer.id }}">{{ indexer.name }}</label>
             </div>
 			{% endfor %}
-            <!-- Add more checkboxes as needed -->
         </fieldset>
 
-        <button type="submit" class="btn btn-primary">Submit</button>
+
+		<div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary btn-lg">Install</button>
+		</div>
     </form>
 </div>
 
