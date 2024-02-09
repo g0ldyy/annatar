@@ -4,7 +4,7 @@ set -ueo pipefail
 kind=${1:-}
 term=${2:-}
 provider=${3:-premiumize}
-max_results=2
+max_results=5
 
 if [ -z "${kind}" ] || [ -z "${term}" ]; then
 	echo "Usage: $0 <kind> <term> [provider]"

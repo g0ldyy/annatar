@@ -2,6 +2,7 @@
 version: '3.8'
 volumes:
   jackett_config: {}
+  redis_data: {}
 
 services:
   web:
@@ -9,10 +10,14 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      - redis
       - jackett
+    volumes:
+      - "redis_data:/app/data"
     environment:
       NUM_WORKERS: "16"
       LOG_LEVEL: debug
+      REDIS_URL: "redis"
       JACKETT_URL: "http://jackett:9117"
       JACKETT_API_KEY: e5jgcghy3oxbmv5dxm26dl64v0hp1ese 
       JACKETT_INDEXERS: >-
@@ -22,6 +27,12 @@ services:
         ,therarbg
         ,torrentgalaxy
         ,yts
+
+  redis:
+    image: docker.io/redis/redis-stack-server
+    mem_limit: 4G
+    volumes:
+      - "redis_data:/data"
 
   jackett:
     image: docker.io/linuxserver/jackett
