@@ -18,7 +18,7 @@ from annatar.torrent import Torrent
 log = structlog.get_logger(__name__)
 
 MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
-INDEXER_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
+JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
 
 async def get_indexers() -> list[Indexer]:
@@ -109,7 +109,7 @@ async def _search_indexer(
             async with session.get(
                 search_url,
                 params=params,
-                timeout=INDEXER_TIMEOUT,
+                timeout=JACKETT_TIMEOUT,
                 headers={"Accept": "application/json"},
             ) as response:
                 if response.status != 200:
@@ -287,7 +287,9 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
     log.info("magnet resolve: following redirect", guid=guid, link=link)
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(link, allow_redirects=False, timeout=1) as response:
+            async with session.get(
+                link, allow_redirects=False, timeout=JACKETT_TIMEOUT
+            ) as response:
                 if response.status == 302:
                     location = response.headers.get("Location", "")
                     log.info("magnet resolve: found redirect", guid=guid, magnet=location)

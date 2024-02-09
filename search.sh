@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ueo pipefail
 
+SERVER_URL=${SERVER_URL:-http://127.0.0.1:8000}
 kind=${1:-}
 term=${2:-}
 provider=${3:-premiumize}
@@ -36,4 +37,4 @@ echo "${term}" \
 	| xargs -I{} -P17 \
 		http --timeout 60 \
 			GET \
-			"http://127.0.0.1:8000/${config}/stream/${kind}/{}.json"
+			"${SERVER_URL}/${config}/stream/${kind}/{}.json"
