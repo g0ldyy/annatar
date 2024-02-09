@@ -113,7 +113,7 @@ async def _search_indexer(
                 headers={"Accept": "application/json"},
             ) as response:
                 if response.status != 200:
-                    log.info(
+                    log.error(
                         "jacket search failed",
                         status=response.status,
                         reason=response.reason,
