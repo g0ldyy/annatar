@@ -1,11 +1,19 @@
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from annatar import logging, middleware, routes, web
 
 logging.init()
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://*.stremio.com", "https://stremio.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
