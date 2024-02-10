@@ -113,8 +113,8 @@ async def _search_indexer(
 
     torrents: dict[str, Torrent] = {}
     tasks = [
-        asyncio.create_task(map_matched_result(result=result, imdb=imdb))
-        for result in search_results
+        asyncio.create_task(map_matched_result(result=result, search_query=search_query, imdb=imdb))
+        for result in search_results[: MAX_RESULTS * 2]
     ]
 
     for task in asyncio.as_completed(tasks):
@@ -229,7 +229,11 @@ async def execute_search(
     return [SearchResult(**result) for result in response_json["Results"]]
 
 
-async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:
+async def map_matched_result(
+    result: SearchResult,
+    search_query: SearchQuery,
+    imdb: int | None,
+) -> Torrent | None:
     if imdb and result.Imdb and result.Imdb != imdb:
         log.info(
             "skipping mismatched IMDB",
@@ -238,8 +242,16 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
         )
         return None
 
-    # TODO check if the Title contains an episode. If it does and it doens't match
-    # the searched episode then skip it
+    if search_query.episode:
+        episode: int | None = human.find_episode(result.Title)
+        if episode and episode != int(search_query.episode):
+            log.info(
+                "skipping mismatched episode",
+                wanted=search_query.episode,
+                got=episode,
+            )
+            return None
+
     if result.InfoHash and result.MagnetUri:
         return Torrent(
             guid=result.Guid,

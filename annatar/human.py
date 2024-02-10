@@ -11,6 +11,27 @@ QUALITIES: dict[str, str] = {
     "720p": r"\b720p\b",
     "480p": r"\b480p\b",
 }
+VIDEO_EXTENSIONS = [
+    "3g2",
+    "3gp",
+    "avi",
+    "flv",
+    "m2ts",
+    "m4v",
+    "mk3d",
+    "mkv",
+    "mov",
+    "mp2",
+    "mp4",
+    "mpe",
+    "mpeg",
+    "mpg",
+    "mpv",
+    "ogm",
+    "ts",
+    "webm",
+    "wmv",
+]
 
 
 def grep_quality(s: str) -> str:
@@ -39,16 +60,30 @@ def pretty_season_episode(season_episode: list[int]) -> str:
     return f"""S{"E".join([str(x) for x in season_episode])}"""
 
 
-def match_season_episode(season_episode: list[int], file: str) -> bool:
-    s = season_episode[0]
-    e = season_episode[1]
-    matches_season: bool = bool(re.search(rf"\bS{s:02}\D", file, re.IGNORECASE)) or bool(
-        re.search(rf"\bS{s}\D", file, re.IGNORECASE)
+def match_season(season: int, file: str) -> bool:
+    return bool(re.search(rf"\bS{season:02}\D", file, re.IGNORECASE)) or bool(
+        re.search(rf"\bS{season}\D", file, re.IGNORECASE)
     )
 
-    matches_episode: bool = bool(re.search(rf"E{e:02}\b", file, re.IGNORECASE)) or bool(
-        re.search(rf"E{e}\b", file, re.IGNORECASE)
-    )
+
+def is_video(file: str) -> bool:
+    return file.split(".")[-1] in VIDEO_EXTENSIONS
+
+
+def match_episode(episode: int, file: str) -> bool:
+    return find_episode(file) == episode
+
+
+def find_episode(file: str) -> int | None:
+    match = re.search(rf"[^A-Z]E(\d\d?)\b", file, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+
+
+def match_season_episode(season_episode: list[int], file: str) -> bool:
+    matches_season = match_season(season_episode[0], file)
+    matches_episode = match_episode(season_episode[1], file)
+
     log.debug(
         "pattern match result",
         matches_season=matches_season,

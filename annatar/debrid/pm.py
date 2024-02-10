@@ -27,6 +27,10 @@ async def select_stream_file(
         return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
 
     for file in sorted_files:
+        if not human.is_video(file.path):
+            log.debug("file is not a video", file=file.path)
+            continue
+
         path = file.path.split("/")[-1].lower()
         if human.match_season_episode(season_episode=season_episode, file=path):
             log.debug("path matches season and episode", path=path, season_episode=season_episode)
