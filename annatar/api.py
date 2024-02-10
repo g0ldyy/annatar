@@ -91,11 +91,11 @@ async def _search(
 
     streams: list[Stream] = [
         Stream(
-            title=media_info.name,
+            title=link.name,
             url=link.url,
             name="\r\n".join(
                 [
-                    f"[{debrid.short_name()}+] {link.name}",
+                    f"[{debrid.short_name()}+] {human.grep_quality(link.name)}",
                     f"💾 {human.bytes(float(link.size))}",
                 ]
             ),

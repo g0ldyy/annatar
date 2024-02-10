@@ -39,6 +39,9 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV DB_PATH /app/data/annatar.db
 
+ARG BUILD_VERSION=UNKNOWN
+ENV BUILD_VERSION=${BUILD_VERSION}
+
 VOLUME /app/data
 # Set the working directory in the container
 WORKDIR /app

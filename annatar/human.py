@@ -5,6 +5,14 @@ import structlog
 log = structlog.get_logger(__name__)
 
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
+QUALITIES: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
+
+
+def grep_quality(s: str) -> str:
+    """
+    Get the quality of the file
+    """
+    return next((q for q in QUALITIES if re.search(q, s, re.IGNORECASE)), "")
 
 
 def bytes(num: float) -> str:
