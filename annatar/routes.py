@@ -47,8 +47,8 @@ async def get_manifest() -> dict[str, Any]:
         "name": "Annatar",
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
-            "configurable": "true",
-            "configurationRequired": "true",
+            "configurable": True,
+            "configurationRequired": True,
         },
     }
 
