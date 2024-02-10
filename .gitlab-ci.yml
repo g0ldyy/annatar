@@ -3,25 +3,18 @@ stages:
   - push
 
 variables:
-  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
 
-build_image:
+before_script:
+  - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$CI_COMMIT_REF_NAME; fi'
+  - echo "Image tag set to $IMAGE_TAG"
+
+build_and_push:
   stage: build
   image: docker:latest
   services:
     - docker:dind
   script:
-    - docker build --build-arg BUILD_VERSION=$CI_COMMIT_SHORT_SHA -t $IMAGE_TAG .
-  except:
-    - tags
-
-push_to_registry:
-  stage: push
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
+    - docker build --build-arg BUILD_VERSION=$CI_COMMIT_SHORT_SHA -t $DOCKER_IMAGE_NAME:$IMAGE_TAG .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $IMAGE_TAG
-  only:
-    - master
+    - docker push $DOCKER_IMAGE_NAME:$IMAGE_TAG
