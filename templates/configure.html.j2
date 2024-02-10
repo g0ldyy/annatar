@@ -36,9 +36,9 @@
 
 				// Convert object to JSON and encode in base64
 				var base64EncodedData = btoa(JSON.stringify(formObject));
-
-				var launchUrl = 'stremio://community.annatar.lordofgifts/' + base64EncodedData + '/manifest.json'; // Redirect to app URL
+				var launchUrl = 'stremio://{{ ctx.app_id }}/' + base64EncodedData + '/manifest.json';
 				console.log(launchUrl);
+				// Redirect to app URL
 				window.location.href = launchUrl
 			};
 		}, 300);

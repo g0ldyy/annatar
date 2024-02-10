@@ -7,6 +7,8 @@ from pydantic import BaseModel, ValidationError
 
 log = structlog.get_logger()
 
+APP_ID = "community.annatar.lordofgifts"
+
 
 class UserConfig(BaseModel):
     debrid_service: str

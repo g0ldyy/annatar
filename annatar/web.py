@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from annatar import jackett
-from annatar.config import UserConfig, parse_config
+from annatar.config import APP_ID, UserConfig, parse_config
 from annatar.debrid.providers import list_providers
 from annatar.jackett_models import Indexer
 
@@ -16,6 +16,7 @@ log = structlog.get_logger()
 
 
 class FormConfig(BaseModel):
+    app_id: str = APP_ID
     available_indexers: list[Indexer]
     available_debrid_providers: list[dict[str, str]]
 

@@ -37,7 +37,7 @@ class MediaType(str, Enum):
 @router.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
     return {
-        "id": "community.blockloop.annatar",
+        "id": "community.annatar.lordofgifts",
         "icon": "https://i.imgur.com/p4V821B.png",
         "version": "0.1.0",
         "catalogs": [],
