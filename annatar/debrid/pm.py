@@ -21,8 +21,8 @@ async def select_stream_file(
     sorted_files: list[DirectDL] = sorted(files, key=lambda f: f.size, reverse=True)
     if len(sorted_files) == 0:
         return None
-    if len(sorted_files) == 1 or not season_episode:
-        """If there is only one file, or no season_episode is provided, return the first file"""
+    if not season_episode:
+        """No season_episode is provided, return the biggest file"""
         f: DirectDL = sorted_files[0]
         return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
 

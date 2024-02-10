@@ -40,14 +40,22 @@ def pretty_season_episode(season_episode: list[int]) -> str:
 
 
 def match_season_episode(season_episode: list[int], file: str) -> bool:
-    pattern = r"S0?{s}\s?E0?{e}".format(
-        s=season_episode[0],
-        e=season_episode[1],
+    s = season_episode[0]
+    e = season_episode[1]
+    matches_season: bool = bool(re.search(rf"\bS{s:02}\D", file, re.IGNORECASE)) or bool(
+        re.search(rf"\bS{s}\D", file, re.IGNORECASE)
     )
 
-    result = bool(re.search(pattern, file, re.IGNORECASE))
-    log.debug("pattern match result", pattern=pattern, file=file, result=result)
-    return result
+    matches_episode: bool = bool(re.search(rf"E{e:02}\b", file, re.IGNORECASE)) or bool(
+        re.search(rf"E{e}\b", file, re.IGNORECASE)
+    )
+    log.debug(
+        "pattern match result",
+        matches_season=matches_season,
+        matches_episode=matches_episode,
+        file=file,
+    )
+    return matches_season and matches_episode
 
 
 # sort items by quality

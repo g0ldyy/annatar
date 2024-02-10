@@ -15,30 +15,8 @@ from annatar.torrent import Torrent
 log = structlog.get_logger(__name__)
 
 
-async def search(
-    type: str,
-    max_results: int,
-    jackett_url: str,
-    jackett_api_key: str,
-    debrid: DebridService,
-    imdb_id: str,
-    season_episode: list[int] = [],
-    indexers: list[str] = [],
-) -> StreamResponse:
-    return await _search(
-        type=type,
-        max_results=max_results,
-        jackett_url=jackett_url,
-        jackett_api_key=jackett_api_key,
-        debrid=debrid,
-        imdb_id=imdb_id,
-        season_episode=season_episode,
-        indexers=indexers,
-    )
-
-
 @timestamped(["max_results", "jackett_url", "debrid", "imdb_id", "season_episode"])
-async def _search(
+async def search(
     type: str,
     max_results: int,
     jackett_url: str,

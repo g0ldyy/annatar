@@ -84,57 +84,29 @@ async def _search_indexer(
     indexer: str,
     imdb: int | None = None,
 ) -> list[Torrent]:
-    search_url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
     category: str = "2000" if search_query.type == "movie" else "5000"
-    suffix: str = (
-        f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}"
-        if search_query.type == "series"
-        else str(search_query.year)
-    )
-    params: dict[str, Any] = {
-        "apikey": jackett_api_key,
-        "Category": category,
-        "Query": f"{search_query.name} {suffix}".strip(),
-    }
-    params["Tracker[]"] = indexer
+    suffixes: list[str] = [str(search_query.year)]
+    if search_query.type == "series":
+        suffixes = [
+            f"S{str(search_query.season).zfill(2)}",
+            f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}",
+        ]
 
-    async with aiohttp.ClientSession() as session:
-        log.info(
-            "searching jackett",
-            query=search_query.model_dump(),
-            search_params=params,
+    tasks = [
+        execute_search(
+            jackett_api_key=jackett_api_key,
+            jackett_url=jackett_url,
             indexer=indexer,
+            params={
+                "Category": category,
+                "Query": f"{search_query.name} {suffix}".strip(),
+                "Tracker[]": indexer,
+            },
         )
-        try:
-            async with session.get(
-                search_url,
-                params=params,
-                timeout=JACKETT_TIMEOUT,
-                headers={"Accept": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    log.error(
-                        "jacket search failed",
-                        status=response.status,
-                        reason=response.reason,
-                        body=await response.text(),
-                        indexer=indexer,
-                    )
-                    return []
-                response_json = await response.json()
-        except TimeoutError as err:
-            log.error(
-                "jacket search timeout",
-                error=err,
-                query=search_query.model_dump(),
-                params=params,
-                url=search_url,
-                indexer=indexer,
-            )
-            return []
-
+        for suffix in suffixes
+    ]
     search_results: list[SearchResult] = sorted(
-        [SearchResult(**result) for result in response_json["Results"]],
+        [item for sublist in await asyncio.gather(*tasks) for item in sublist],
         key=lambda r: r.Seeders,
         reverse=True,
     )
@@ -219,6 +191,44 @@ async def search_indexers(
     return list(torrents.values())
 
 
+async def execute_search(
+    jackett_url: str,
+    jackett_api_key: str,
+    indexer: str,
+    params: dict[str, Any],
+) -> list[SearchResult]:
+    url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
+    with bound_contextvars(
+        search_params=params,
+        url=url,
+        indexer=indexer,
+    ):
+        params["apikey"] = jackett_api_key
+        async with aiohttp.ClientSession() as session:
+            log.info("searching jackett")
+            try:
+                async with session.get(
+                    url=url,
+                    params=params,
+                    timeout=JACKETT_TIMEOUT,
+                    headers={"Accept": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        log.error(
+                            "jacket search failed",
+                            status=response.status,
+                            reason=response.reason,
+                            body=await response.text(),
+                        )
+                        return []
+                    response_json = await response.json()
+            except TimeoutError as err:
+                log.error("jacket search timeout", error=err, timeout=JACKETT_TIMEOUT)
+                return []
+
+    return [SearchResult(**result) for result in response_json["Results"]]
+
+
 async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent | None:
     if imdb and result.Imdb and result.Imdb != imdb:
         log.info(
@@ -228,6 +238,8 @@ async def map_matched_result(result: SearchResult, imdb: int | None) -> Torrent 
         )
         return None
 
+    # TODO check if the Title contains an episode. If it does and it doens't match
+    # the searched episode then skip it
     if result.InfoHash and result.MagnetUri:
         return Torrent(
             guid=result.Guid,
