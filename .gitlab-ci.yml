@@ -1,0 +1,27 @@
+stages:
+  - build
+  - push
+
+variables:
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build --build-arg BUILD_VERSION=$CI_COMMIT_SHORT_SHA -t $IMAGE_TAG .
+  except:
+    - tags
+
+push_to_registry:
+  stage: push
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $IMAGE_TAG
+  only:
+    - master
