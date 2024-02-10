@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 log = structlog.get_logger()
 
-APP_ID = "community.annatar.lordofgifts"
+APP_ID = "annatar.neon-gopher.ts.net"
 
 
 class UserConfig(BaseModel):
