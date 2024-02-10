@@ -51,7 +51,7 @@
 	<form id="theform">
 		<!-- Floating Form Group for Provider -->
 		<div class="form-floating mb-3">
-			<select class="form-select" id="debrid_provider" name="debrid_provider" aria-label="Debrid Provider">
+			<select class="form-select" id="debrid_service" name="debrid_service" aria-label="Debrid Provider">
 				{% for provider in ctx.available_debrid_providers %}
 				<option selected value="{{ provider.id }}">{{ provider.name }}</option>
 				{% endfor %}
