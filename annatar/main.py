@@ -2,10 +2,8 @@ from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from starlette.status import HTTP_204_NO_CONTENT
 
 from annatar import logging, middleware, routes, web
 
@@ -20,17 +18,13 @@ log = structlog.get_logger(__name__)
 # XXX These are executed in reverse order
 app.add_middleware(middleware.RequestLogger)
 app.add_middleware(middleware.RequestID)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://*.stremio.com"],
-)
 
 
 # handle CORS preflight requests
 @app.options("/{rest_of_path:path}")
 async def preflight_handler(request: Request, rest_of_path: str) -> Response:
     return Response(
-        status_code=HTTP_204_NO_CONTENT,
+        status_code=200,
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
