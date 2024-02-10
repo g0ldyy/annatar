@@ -34,6 +34,11 @@ class MediaType(str, Enum):
         return [media_type.value for media_type in MediaType]
 
 
+@router.get("/")
+async def root_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/configure", status_code=HTTP_302_FOUND)
+
+
 @router.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
     return {
