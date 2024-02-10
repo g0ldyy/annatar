@@ -10,6 +10,9 @@ class RealDebridProvider(DebridService):
     def __str__(self) -> str:
         return "RealDebridProvider"
 
+    def short_name(self) -> str:
+        return "RD"
+
     def name(self) -> str:
         return "real-debrid.com"
 

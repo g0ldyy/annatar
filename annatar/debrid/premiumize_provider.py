@@ -1,12 +1,15 @@
 from annatar.debrid import pm
-from annatar.debrid.models import StreamLink
 from annatar.debrid.debrid_service import DebridService
+from annatar.debrid.models import StreamLink
 from annatar.torrent import Torrent
 
 
 class PremiumizeProvider(DebridService):
     def __str__(self) -> str:
         return "PremiumizeProvider"
+
+    def short_name(self) -> str:
+        return "PM"
 
     def name(self) -> str:
         return "premiumize.me"
