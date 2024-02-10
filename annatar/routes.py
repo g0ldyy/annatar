@@ -39,6 +39,11 @@ async def root_redirect() -> RedirectResponse:
     return RedirectResponse(url="/configure", status_code=HTTP_302_FOUND)
 
 
+@router.get("/{b64config:str}/manifest.json")
+async def get_manifst_with_config() -> dict[str, Any]:
+    return await get_manifest()
+
+
 @router.get("/manifest.json")
 async def get_manifest() -> dict[str, Any]:
     return {
