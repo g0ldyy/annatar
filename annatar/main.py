@@ -1,19 +1,16 @@
 from typing import Any
 
-import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from annatar import logging, middleware, routes, web
+from annatar import instrumentation, logging, middleware, routes, web
 
+instrumentation.init()
 logging.init()
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-log = structlog.get_logger(__name__)
-
 
 # XXX These are executed in reverse order
 app.add_middleware(middleware.RequestLogger)
@@ -45,3 +42,4 @@ async def add_CORS_header(request: Request, call_next: Any):
 
 app.include_router(routes.router)
 app.include_router(web.router)
+instrumentation.instrument_fastapi(app)
