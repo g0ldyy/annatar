@@ -16,10 +16,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 
 RedisInstrumentor().instrument()  # type: ignore
-ENV: str = os.environ.get("ENV", "dev")
+OTEL_EXPORTER_OTLP_ENDPOINT: str = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 SAMPLE_RATE: float = float(os.environ.get("TRACING_SAMPLE_RATIO", "0.05"))
 
-if ENV == "prod":
+if OTEL_EXPORTER_OTLP_ENDPOINT:
     # tracing
     provider = TracerProvider(sampler=TraceIdRatioBased(SAMPLE_RATE))
     processor = BatchSpanProcessor(OTLPSpanExporter())
