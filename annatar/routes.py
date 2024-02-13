@@ -40,14 +40,14 @@ async def root_redirect() -> RedirectResponse:
 
 
 @router.get("/{b64config:str}/manifest.json")
-async def get_manifst_with_config() -> dict[str, Any]:
-    return await get_manifest()
+async def get_manifst_with_config(request: Request) -> dict[str, Any]:
+    return await get_manifest(request)
 
 
 @router.get("/manifest.json")
-async def get_manifest() -> dict[str, Any]:
+async def get_manifest(request: Request) -> dict[str, Any]:
     return {
-        "id": APP_ID,
+        "id": request.url.hostname,
         "icon": "https://i.imgur.com/p4V821B.png",
         "version": "0.1.0",
         "catalogs": [],
