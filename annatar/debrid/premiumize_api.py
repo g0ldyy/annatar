@@ -77,5 +77,5 @@ async def directdl(
             body=await dl_res.response.text(),
         )
         return None
-    await db.set(key=cache_key, value=dl_res.model.model_dump_json(), ttl=timedelta(days=1))
+    await db.set(key=cache_key, value=dl_res.model.model_dump_json(), ttl=timedelta(weeks=4))
     return dl_res.model

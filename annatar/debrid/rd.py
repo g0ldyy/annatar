@@ -197,7 +197,7 @@ async def get_stream_for_torrent(
         name=unrestricted_link.filename,
         url=unrestricted_link.download,
     )
-    await db.set_model(cache_key, sl, ttl=timedelta(weeks=1))
+    await db.set_model(cache_key, sl, ttl=timedelta(weeks=4))
     return sl
 
 

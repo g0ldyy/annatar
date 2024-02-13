@@ -77,6 +77,6 @@ async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
     await db.set(
         cache_key,
         res.model_dump_json(),
-        ttl=timedelta(hours=3),
+        ttl=timedelta(days=30),
     )
     return res

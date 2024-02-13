@@ -31,7 +31,7 @@ async def cache_torrents(torrents: list[Torrent]) -> None:
             db.set_model(
                 f"torrent:{torrent.info_hash}",
                 torrent,
-                ttl=timedelta(weeks=52),
+                ttl=timedelta(weeks=8),
             )
         )
         for torrent in torrents
