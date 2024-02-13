@@ -24,7 +24,7 @@ setTimeout(function (){
 
 		// Convert object to JSON and encode in base64
 		var base64EncodedData = btoa(JSON.stringify(formObject));
-		var launchUrl = 'stremio://{{ ctx.app_id }}/' + base64EncodedData + '/manifest.json';
+		var launchUrl = 'stremio://' + window.location.hostname + '/' + base64EncodedData + '/manifest.json';
 		console.log(launchUrl);
 		// Redirect to app URL
 		window.location.href = launchUrl
