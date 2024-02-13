@@ -5,34 +5,21 @@ volumes:
   redis_data: {}
 
 services:
-  web:
-    build: .
+  annatar:
+    image: registry.gitlab.com/stremio-add-ons/annatar:latest
     ports:
       - "8000:8000"
     depends_on:
-      - redis
       - jackett
     volumes:
       - "redis_data:/app/data"
     environment:
-      NUM_WORKERS: "16"
       LOG_LEVEL: debug
-      REDIS_URL: "redis"
       JACKETT_URL: "http://jackett:9117"
-      JACKETT_API_KEY: e5jgcghy3oxbmv5dxm26dl64v0hp1ese 
-      JACKETT_INDEXERS: >-
-        eztv
-        ,kickasstorrents-ws
-        ,thepiratebay
-        ,therarbg
-        ,torrentgalaxy
-        ,yts
-
-  redis:
-    image: docker.io/redis/redis-stack-server
-    mem_limit: 4G
-    volumes:
-      - "redis_data:/data"
+      JACKETT_API_KEY: "<Set this value from Jackett>"
+      JACKETT_MAX_RESULTS: "10" # max results from jackett search
+      JACKETT_TIMEOUT: "5" # max time spent searching per indexer.
+      JACKETT_INDEXERS: "eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,yts"
 
   jackett:
     image: docker.io/linuxserver/jackett

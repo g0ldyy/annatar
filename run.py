@@ -2,10 +2,11 @@ import os
 
 import uvicorn
 
+NUM_CORES: int = os.cpu_count() or 1
 BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
 HOST: str = os.getenv("LISTEN_HOST", "0.0.0.0")
 PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
-WORKERS = int(os.getenv("WORKERS", "2"))
+WORKERS = int(os.getenv("WORKERS", 2 * NUM_CORES))
 
 
 if __name__ == "__main__":
