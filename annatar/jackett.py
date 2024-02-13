@@ -28,9 +28,9 @@ async def get_indexers() -> list[Indexer]:
 async def cache_torrents(torrents: list[Torrent]) -> None:
     tasks = [
         asyncio.create_task(
-            db.set(
+            db.set_model(
                 f"torrent:{torrent.info_hash}",
-                torrent.model_dump_json(),
+                torrent,
                 ttl=timedelta(weeks=52),
             )
         )
@@ -112,6 +112,7 @@ async def search_indexer(
         )
     )
 
+    await cache_torrents(torrents.values())
     return prioritized_list
 
 

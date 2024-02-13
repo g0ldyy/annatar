@@ -8,7 +8,7 @@ class DebridService(ABC):
     api_key: str
 
     def __str__(self) -> str:
-        return self.__class__.__name__
+        return self.name()
 
     def __init__(self, api_key: str):
         self.api_key = api_key
