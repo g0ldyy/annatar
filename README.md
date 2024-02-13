@@ -1,34 +1,67 @@
-# Annatar
+# Annatar - Lord of Gifts
 
 ![](https://i.imgur.com/UIVsFy7.png)
 
-**Annatar** - Lord of Gifts. A [Stremio](https://www.stremio.com/) plugin enabling you to search popular torrent sites and debrid caches for streamable content.
+The fastest just-in-time torrent/debrid search add-on for [Stremio](https://www.stremio.com/) providing results in under 3s.
 
-**<u>DISCLAIMER</u>**: *This code does not interact with torrent protocols, nor does it download or stream any content whatsoever. It is a Stremio plugin that provides only metadata and links by searching torrent indexers for content and searching Debrid services.* 
+Annatar searches torrent and debrid sites for cached content to provide instantly available content for Stremio. Results from Annatar typically arrive in **3s or less**. Annatar achieves its speed by using several fanout queries and map-reduce functions to gather the fastest and most accurate results using Jackett APIs. 
 
-This plugin is implemented in python using tie [Stremio protocol definition](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md).
+I created this plugin because I wanted a self-hosted alternative to Torrentio. 
+
+## The Fastest
+
+There are other plugins (namely stremio-jackett) that are similar to Annatar, but my experience with them has been not great. Results typically take over 10s which is far from ideal. Annatar is fast enough that the short delay does not bother me. Content is cached using [redislite](https://redislite.readthedocs.io/en/latest/). This includes debrid links, Torrent metadata, and Jackett search results. 
 
 ## Running Locally
 
-1. Install docker and docker-compose
-2. Clone this repo
-3. `docker-compose up -d`
-4. open http://localhost:9117/
-5. Add some indexers (**DO NOT CHOOSE SLOW INDEXERS**). I recommend the ones pictured below for almost all TV and Movies. They are the fastest providers. ![](https://i.imgur.com/gYPNEyM.png)
-6. Copy your API Key from Jackett (top right)
-7. edit `docker-compose.yaml` and paste your API key under `annatar -> env -> JACKETT_API_KEY`
-8. `docker-compose restart annatar`
+:warning: It is important to note that the indexers you choose to search are what determines the speed of Annatar results. Those listed in the image below are the ones that I have had the best experience with and also provide results for almost everything I search. choose your indexers carefully. If you aren't sure which ones are fast/slow then add one and use the Manual Search button in Jackett and set the indexer in the query. If the results take forever then that's a slow indexer. :warning: 
 
-## Torrentio is Better
+**Annatar must be accessible on your local network**. Run it on a desktop, VM, or server somewhere that you can reach from your local network. The Stremio apps will communicate with the add-on over HTTP.
 
-If you want a button-click torrent indexer and searcher then go with Torrentio. This is a self-hosted alternative for when [Torrentio is down](https://www.reddit.com/r/StremioAddons/comments/1acl7ss/torrentio_faq/) or if you prefer to host your own software.
+ ### If You Already Have Jackett
 
+```
+docker run -d -p 8000:8000 -v ./annatar-data:/app/data --name annatar \
+	-e JACKETT_URL=<your jackett URL> \
+	-e JACKETT_API_KEY=<your jackett api key> \
+	-e JACKETT_INDEXERS=eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,yts
+```
 
+### If you don't already have Jackett
 
-## How It Works
+```bash
+# create a working directory
+mkdir -p annatar
+cd annatar
+# Download the docker-compose
+curl -LJO https://gitlab.com/stremio-add-ons/annatar/-/raw/master/docker-compose.yaml
+docker-compose up -d jackett
+```
 
-Torrentio gives you instant results because it indexes content out of band of the search API. Meaning, when you search something against Torrentio you are interacting with a cached dataset. That improves performance but costs more resources and a lot more code. 
+Open http://localhost:9117 and add some indexers. I recommend the ones pictured below for almost all TV and Movies. They are the fastest providers. If someone wants to suggest others open a PR (i.e. anime indexers). 
 
-The current problem with other alternatives is that they are _very_ slow. 
+![](https://i.imgur.com/gYPNEyM.png)
 
-Because of how it is written, Annatar gives you _fast enough_ results depending on the indexer you are using. My experience with the indexers above have yielded results in Stremio almost always **under 5 seconds and usually around 3 seconds**. Annatar uses asyncio and multi-threadding to divide and conquer. When a search request is received it queries all indexers in parallel. 
+Edit `docker-compose.yaml` and paste your API key under `annatar -> env -> JACKETT_API_KEY`
+
+Run Annatar. `docker-compose up -d`
+
+Install the add-on to Stremio:
+
+1. Open `http://<host>:8000/configure` on a machine that has Stremio installed
+
+2. Type in your details and click Install
+
+   ![](./img/configure.png)
+
+3. This will launch the plugin the Stremio app. 
+
+## This is not Torrentio
+
+Torrentio provides instant results because it uses a crawler to cache content from indexers. All searches against the Torrentio add-on yield results from cached content. While this provides instant results it comes at a cost. Sometimes that [cost is downtime](https://www.reddit.com/r/StremioAddons/comments/1acl7ss/torrentio_faq/), but it also means that Torrentio caches much more than I need or care to know about. Also, because of this added complexity it is [non-trivial](https://github.com/Gabisonfire/knightcrawler) to self-host Torrentio. 
+
+This plugin is implemented in python using the [Stremio protocol definition](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md).
+
+---
+
+**<u>DISCLAIMER</u>**: *This software does not interact with torrent protocols, nor does it download or stream any content whatsoever. It is a Stremio plugin that provides only metadata and links by searching torrent indexers for content and searching Debrid services. Interacting with torrent indexers may be illegal in your country.* 
