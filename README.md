@@ -56,12 +56,6 @@ Install the add-on to Stremio:
 
 3. This will launch the plugin the Stremio app. 
 
-
-
-## Debrid Providers
-
-For now I have only implemented real-debrid.com and premiumize.me because those are the two that I use. 
-
 ## This is not Torrentio
 
 Torrentio provides instant results because it uses a crawler to cache content from indexers. All searches against the Torrentio add-on yield results from cached content. While this provides instant results it comes at a cost. Sometimes that [cost is downtime](https://www.reddit.com/r/StremioAddons/comments/1acl7ss/torrentio_faq/), but it also means that Torrentio caches much more than I need or care to know about. Also, because of this added complexity it is [non-trivial](https://github.com/Gabisonfire/knightcrawler) to self-host Torrentio. 
