@@ -10,13 +10,17 @@ I created this plugin because I wanted a self-hosted alternative to Torrentio.
 
 ## The Fastest
 
-There are other plugins (namely stremio-jackett) that are similar to Annatar, but my experience with them has been not great. Results typically take over 10s which is far from ideal. Annatar is fast enough that the short delay does not bother me. Content is cached using [redislite](https://redislite.readthedocs.io/en/latest/). This includes debrid links, Torrent metadata, and Jackett search results. 
+There are other plugins that are similar to Annatar, but my experience with them has been not great. Results typically take over 10s which is far from ideal. Annatar is fast enough that the short delay does not bother me. Content is cached using [redislite](https://redislite.readthedocs.io/en/latest/). This includes debrid links, Torrent metadata, and Jackett search results. 
+
+Cache is built based on user-requests. Each new imdb id will be cold requested from Jackett, Cinemeta, and Debrid. Subsequent requests will retrieve cache (given some TTLs depending on arbitrary logic).
 
 ## Running Locally
 
-:warning: It is important to note that the indexers you choose to search are what determines the speed of Annatar results. Those listed in the image below are the ones that I have had the best experience with and also provide results for almost everything I search. choose your indexers carefully. If you aren't sure which ones are fast/slow then add one and use the Manual Search button in Jackett and set the indexer in the query. If the results take forever then that's a slow indexer. :warning: 
+:warning: It is important to note that the indexers you choose to search are what determines the cold speed of Annatar results. Those listed in the image below are the ones that I have had the best experience with and also provide results for almost everything I search. choose your indexers carefully. If you aren't sure which ones are fast/slow then add one and use the Manual Search button in Jackett and set the indexer in the query. If the results take forever then that's a slow indexer. :warning: 
 
-**Annatar must be accessible on your local network**. Run it on a desktop, VM, or server somewhere that you can reach from your local network. The Stremio apps will communicate with the add-on over HTTP.
+**Annatar must be accessible by Stremio via HTTPS**. Run it on a desktop, VM, or server somewhere that your Stremio apps can reach it. You will need HTTPS otherwise Stremio will not install the plugin. See #1 for comments. 
+
+Annatar does not import certificates. You will likely need a reverse proxy such as nginx or Caddy. See #1 comments for an nginx example.
 
  ### If You Already Have Jackett
 
