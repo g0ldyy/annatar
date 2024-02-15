@@ -5,7 +5,7 @@ SERVER_URL=${SERVER_URL:-http://127.0.0.1:8000}
 kind=${1:-}
 term=${2:-}
 provider=${3:-premiumize}
-max_results=5
+max_results=10
 
 if [ -z "${kind}" ] || [ -z "${term}" ]; then
 	echo "Usage: $0 <kind> <term> [provider]"
@@ -35,6 +35,8 @@ EOF
 echo "${term}" \
 	| tr ',' '\n' \
 	| xargs -I{} -P17 \
-		http --timeout 60 \
-			GET \
-			"${SERVER_URL}/${config}/stream/${kind}/{}.json"
+		timeout 30 curl \
+			-SLs \
+			-D /dev/stderr \
+			-X GET \
+			"${SERVER_URL}/${config}/stream/${kind}/{}.json" | jq .

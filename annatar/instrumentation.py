@@ -23,18 +23,26 @@ from prometheus_client import (
     multiprocess,
 )
 
-# prometheus
 REGISTRY = CollectorRegistry()
 multiprocess.MultiProcessCollector(REGISTRY)
 
-Gauge("build_info", "build information", multiprocess_mode="livemin").set(1)
+Gauge(
+    name="build_info",
+    documentation="build information",
+    multiprocess_mode="livemin",
+    registry=REGISTRY,
+    labelnames=["version"],
+).labels(version=os.getenv("BUILD_VERSION", "UNKNOWN")).set(1)
 
 
 async def metrics_handler(request: Request):
     data = generate_latest(REGISTRY)
     return Response(
         content=data,
-        headers={"Content-Type": CONTENT_TYPE_LATEST, "Content-Length": str(len(data))},
+        headers={
+            "Content-Type": CONTENT_TYPE_LATEST,
+            "Content-Length": str(len(data)),
+        },
     )
 
 

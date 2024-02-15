@@ -1,13 +1,15 @@
 import re
+from datetime import datetime, timedelta
 from typing import Optional
 
 import structlog
+from prometheus_client import Histogram
 
-from annatar import human, jackett
+from annatar import human, instrumentation, jackett
+from annatar.database import db
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.jackett_models import Indexer, SearchQuery
-from annatar.logging import timestamped
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
 from annatar.torrent import Torrent
@@ -15,8 +17,7 @@ from annatar.torrent import Torrent
 log = structlog.get_logger(__name__)
 
 
-@timestamped(["max_results", "jackett_url", "debrid", "imdb_id", "season_episode"])
-async def search(
+async def _search(
     type: str,
     max_results: int,
     jackett_url: str,
@@ -26,6 +27,15 @@ async def search(
     season_episode: list[int] = [],
     indexers: list[str] = [],
 ) -> StreamResponse:
+    idx: str = "-".join(sorted(indexers))
+    cache_key: str = f"api:search:{type}:{imdb_id}:{season_episode}:{debrid.id()}:{idx}"
+    cached: Optional[StreamResponse] = await db.get_model(cache_key, StreamResponse)
+    if cached:
+        return StreamResponse(
+            streams=cached.streams[:max_results],
+            cached=True,
+        )
+
     media_info: Optional[MediaInfo] = await get_media_info(id=imdb_id, type=type)
     if not media_info:
         log.error("error getting media info", type=type, id=imdb_id)
@@ -80,4 +90,76 @@ async def search(
         )
         for link in sorted_links
     ]
-    return StreamResponse(streams=streams)
+    resp = StreamResponse(streams=streams)
+    await db.set_model(cache_key, resp, ttl=timedelta(days=7))
+    return resp
+
+
+REQUEST_DURATION_BUCKETS = [
+    0.005,
+    0.010,
+    0.025,
+    0.050,
+    0.080,
+    0.100,
+    0.250,
+    0.500,
+    0.800,
+    1.500,
+    2.200,
+    4.000,
+    8.000,
+    12.000,
+]
+
+REQUEST_DURATION = Histogram(
+    name="api_request_duration_seconds",
+    documentation="Duration of API requests in seconds",
+    labelnames=["type", "debrid_service", "cached", "error"],
+    buckets=REQUEST_DURATION_BUCKETS,
+    registry=instrumentation.REGISTRY,
+)
+
+
+async def search(
+    type: str,
+    max_results: int,
+    jackett_url: str,
+    jackett_api_key: str,
+    debrid: DebridService,
+    imdb_id: str,
+    season_episode: list[int] = [],
+    indexers: list[str] = [],
+) -> StreamResponse:
+    start_time = datetime.now()
+    res: Optional[StreamResponse] = None
+    try:
+        res = await _search(
+            type=type,
+            max_results=max_results,
+            jackett_url=jackett_url,
+            jackett_api_key=jackett_api_key,
+            debrid=debrid,
+            imdb_id=imdb_id,
+            season_episode=season_episode,
+            indexers=indexers,
+        )
+        return res
+    except Exception as e:
+        log.error("error searching", type=type, id=imdb_id, error=str(e))
+        res = StreamResponse(streams=[], error="Error searching")
+        return res
+    finally:
+        secs = (datetime.now() - start_time).total_seconds()
+        REQUEST_DURATION.labels(
+            type=type,
+            debrid_service=debrid.id(),
+            cached=res.cached if res else False,
+            error=True if res and res.error else False,
+        ).observe(
+            secs,
+            exemplar={
+                "imdb": imdb_id,
+                "season_episode": ",".join([str(i) for i in season_episode]),
+            },
+        )

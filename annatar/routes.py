@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
 from annatar import api
-from annatar.config import APP_ID, UserConfig, parse_config
+from annatar.config import UserConfig, parse_config
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
 from annatar.debrid.real_debrid_provider import RealDebridProvider

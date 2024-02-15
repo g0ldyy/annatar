@@ -2,20 +2,12 @@ import asyncio
 import inspect
 import logging
 import os
-import sys
 from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
 import __main__
 import structlog
-
-log_level: str = os.getenv("LOG_LEVEL", "INFO")
-logging.basicConfig(
-    format="%(message)s",
-    stream=sys.stdout,
-    level=logging.getLevelName(log_level.upper()),
-)
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

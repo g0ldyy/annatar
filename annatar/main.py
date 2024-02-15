@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 
 from annatar import instrumentation, logging, middleware, routes, web
 
-instrumentation.init()
 logging.init()
+instrumentation.init()
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

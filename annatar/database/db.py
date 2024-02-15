@@ -8,6 +8,8 @@ from prometheus_client import Histogram
 from pydantic import BaseModel, ValidationError
 from redislite import StrictRedis  # type: ignore
 
+from annatar import instrumentation
+
 log = structlog.get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -40,6 +42,7 @@ REQUEST_DURATION = Histogram(
     documentation="Duration of Redis requests in seconds",
     labelnames=["command"],
     buckets=REQUEST_DURATION_BUCKETS,
+    registry=instrumentation.REGISTRY,
 )
 
 

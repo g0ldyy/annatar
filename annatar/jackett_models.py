@@ -3,6 +3,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from annatar.torrent import Torrent
+
+
+class Torrents(BaseModel):
+    items: list[Torrent]
+
 
 class ListIndexersResponse(BaseModel):
     pass

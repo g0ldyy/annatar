@@ -8,10 +8,16 @@ import structlog
 from prometheus_client import Histogram
 from structlog.contextvars import bound_contextvars
 
-from annatar import human
+from annatar import human, instrumentation
 from annatar.database import db
 from annatar.debrid import magnet
-from annatar.jackett_models import Indexer, SearchQuery, SearchResult, SearchResults
+from annatar.jackett_models import (
+    Indexer,
+    SearchQuery,
+    SearchResult,
+    SearchResults,
+    Torrents,
+)
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
@@ -40,6 +46,7 @@ REQUEST_DURATION = Histogram(
     documentation="Duration of Jackett requests in seconds",
     labelnames=["method", "indexer", "status"],
     buckets=REQUEST_DURATION_BUCKETS,
+    registry=instrumentation.REGISTRY,
 )
 
 
@@ -68,6 +75,13 @@ async def search_indexer(
     indexer: str,
     imdb: int | None = None,
 ) -> list[Torrent]:
+    cache_key: str = (
+        f"jackett:indexer:{indexer}:search:{search_query.type}:{search_query.name}:{search_query.year}:{search_query.season}:{search_query.episode}"
+    )
+    cached_torrents: Torrents | None = await db.get_model(cache_key, Torrents)
+    if cached_torrents:
+        return cached_torrents.items
+
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffixes: list[str] = [str(search_query.year)]
     if search_query.type == "series":
@@ -98,7 +112,7 @@ async def search_indexer(
     torrents: dict[str, Torrent] = {}
     tasks = [
         asyncio.create_task(map_matched_result(result=result, search_query=search_query, imdb=imdb))
-        for result in search_results[: MAX_RESULTS * 2]
+        for result in search_results
     ]
 
     for task in asyncio.as_completed(tasks):
@@ -112,12 +126,6 @@ async def search_indexer(
                 title=torrent.title,
                 seeders=torrent.seeders,
             )
-            if len(torrents) >= MAX_RESULTS:
-                break
-
-    for task in tasks:
-        if not task.done():
-            task.cancel()
 
     # prioritize items by quality
     prioritized_list: list[Torrent] = list(
@@ -133,7 +141,9 @@ async def search_indexer(
         )
     )
 
-    await cache_torrents(torrents.values())
+    if len(prioritized_list) > 0:
+        await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=7))
+
     return prioritized_list
 
 

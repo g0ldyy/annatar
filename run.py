@@ -1,4 +1,6 @@
+import logging
 import os
+import sys
 
 import uvicorn
 
@@ -9,6 +11,12 @@ PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
 WORKERS = int(os.getenv("WORKERS", 2 * NUM_CORES))
 PROM_DIR = os.getenv("PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{os.getpid()}")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
+
+logging.basicConfig(
+    format="%(message)s",
+    stream=sys.stdout,
+    level=logging._nameToLevel[LOG_LEVEL.upper()],  # type: ignore
+)
 
 
 if __name__ == "__main__":

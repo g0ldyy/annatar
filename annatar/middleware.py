@@ -9,6 +9,8 @@ from prometheus_client import Histogram
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
+from annatar import instrumentation
+
 log = structlog.get_logger(__name__)
 request_id = ContextVar("request_id", default="MISSING")
 
@@ -19,6 +21,7 @@ REQUEST_DURATION = Histogram(
     documentation="Duration of HTTP requests in seconds",
     labelnames=["method", "request_handler", "status"],
     buckets=REQUEST_DURATION_BUCKETS,
+    registry=instrumentation.REGISTRY,
 )
 
 
