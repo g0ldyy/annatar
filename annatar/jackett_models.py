@@ -20,7 +20,7 @@ class Category(BaseModel):
 
     @staticmethod
     def find_by_name(name: str) -> Optional["Category"]:
-        if name == "movies":
+        if name == "movie":
             return MOVIES
         elif name == "series":
             return SERIES
