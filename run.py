@@ -8,6 +8,7 @@ HOST: str = os.getenv("LISTEN_HOST", "0.0.0.0")
 PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
 WORKERS = int(os.getenv("WORKERS", 2 * NUM_CORES))
 PROM_DIR = os.getenv("PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{os.getpid()}")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
 
 if __name__ == "__main__":
@@ -31,4 +32,5 @@ if __name__ == "__main__":
         reload=False,
         workers=WORKERS,
         loop="uvloop",
+        log_level=LOG_LEVEL,
     )
