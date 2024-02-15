@@ -21,27 +21,10 @@ redis: StrictRedis = (
     StrictRedis(host=REDIS_URL, **REDIS_FLAGS) if REDIS_URL else StrictRedis(DB_PATH, **REDIS_FLAGS)
 )
 
-REQUEST_DURATION_BUCKETS = [
-    0.001,
-    0.005,
-    0.010,
-    0.025,
-    0.050,
-    0.100,
-    0.250,
-    0.500,
-    0.750,
-    1.000,
-    1.700,
-    2.500,
-    5.000,
-]
-
 REQUEST_DURATION = Histogram(
     name="redis_command_duration_seconds",
     documentation="Duration of Redis requests in seconds",
     labelnames=["command"],
-    buckets=REQUEST_DURATION_BUCKETS,
     registry=instrumentation.REGISTRY,
 )
 
