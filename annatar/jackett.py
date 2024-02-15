@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -25,27 +26,11 @@ log = structlog.get_logger(__name__)
 MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
 JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
-REQUEST_DURATION_BUCKETS = [
-    0.050,
-    0.100,
-    0.250,
-    0.500,
-    0.750,
-    1.000,
-    1.700,
-    2.500,
-    5.000,
-    7.500,
-    10.000,
-    12.000,
-    15.000,
-]
 
 REQUEST_DURATION = Histogram(
     name="jackett_request_duration_seconds",
     documentation="Duration of Jackett requests in seconds",
     labelnames=["method", "indexer", "status"],
-    buckets=REQUEST_DURATION_BUCKETS,
     registry=instrumentation.REGISTRY,
 )
 
@@ -68,6 +53,7 @@ async def search_indexer(
     if cached_torrents:
         return cached_torrents.items
 
+    sanitized_name: str = re.sub(r"\W", " ", search_query.name)
     category: str = "2000" if search_query.type == "movie" else "5000"
     suffixes: list[str] = [str(search_query.year)]
     if search_query.type == "series":
@@ -83,7 +69,7 @@ async def search_indexer(
             indexer=indexer,
             params={
                 "Category": category,
-                "Query": f"{search_query.name} {suffix}".strip(),
+                "Query": f"{sanitized_name} {suffix}".strip(),
                 "Tracker[]": indexer,
             },
         )
@@ -105,6 +91,9 @@ async def search_indexer(
         torrent: Optional[Torrent] = await task
         if torrent:
             torrents[torrent.info_hash] = torrent
+            await db.set_model(
+                key=f"torrent:{torrent.info_hash}", model=torrent, ttl=timedelta(weeks=8)
+            )
             log.info(
                 "found a torrent",
                 tracker=indexer,

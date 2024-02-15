@@ -1,10 +1,11 @@
-import asyncio
+from datetime import datetime
+from typing import Any
 
 import aiohttp
 import structlog
 
+from annatar import instrumentation
 from annatar.debrid.rd_models import InstantFile, TorrentInfo, UnrestrictedLink
-from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
@@ -13,42 +14,69 @@ ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 log = structlog.get_logger(__name__)
 
 
-@timestamped()
+async def make_request(
+    method: str,
+    debrid_token: str,
+    url: str,
+    url_values: dict[str, str] = {},
+    body: dict[str, Any] = {},
+) -> Any:
+    api_url = f"{ROOT_URL}{url.format(**url_values)}"
+    start_time = datetime.now()
+    status_code: str = "2xx"
+    error = False
+    try:
+        async with aiohttp.ClientSession() as session:
+            api_headers = {"Authorization": f"Bearer {debrid_token}"}
+            async with session.request(method, api_url, headers=api_headers, data=body) as response:
+                status_code = f"{response.status//100}xx"  # type: ignore
+                if response.status not in range(200, 300):
+                    timer.labels(error="true")  # type: ignore
+                    log.error(
+                        "Error making request",
+                        status=response.status,
+                        reason=response.reason,
+                        body=await response.text(),
+                    )
+                    return None
+                response_json = await response.json()
+                return response_json
+    except Exception as e:
+        log.error("Error making request", error=e)
+        error = True
+        return None
+    finally:
+        instrumentation.HTTP_CLIENT_REQUEST_DURATION.labels(
+            client="real_debrid",
+            method=method,
+            url=url,
+            error=error,
+            status_code=status_code,
+        ).observe((datetime.now() - start_time).total_seconds())
+
+
 async def add_magnet(magnet_link: str, debrid_token: str) -> str | None:
     """
     Adds a magnet link to RD and returns the torrent id.
     """
-    api_url = f"{ROOT_URL}/torrents/addMagnet"
-    body = {"magnet": magnet_link}
-
-    async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.post(api_url, headers=api_headers, data=body) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Got status adding magnet to RD", status=response.status, magnet=magnet_link
-                )
-                return None
-            response_json = await response.json()
-            log.info("Magnet added to RD", torrent=response_json["id"], magnet=magnet_link)
-            return response_json["id"]
+    response_json = await make_request(
+        method="post",
+        url="/torrents/addMagnet",
+        debrid_token=debrid_token,
+        body={"magnet": magnet_link},
+    )
+    return response_json["id"] if response_json else None
 
 
-@timestamped()
 async def get_instant_availability(info_hash: str, debrid_token: str) -> list[InstantFile]:
-    api_url = f"{ROOT_URL}/torrents/instantAvailability/{info_hash}"
-    async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.get(api_url, headers=api_headers) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error getting instant availability",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return []
-            res = await response.json()
+    res = await make_request(
+        method="GET",
+        url="/torrents/instantAvailability/{info_hash}",
+        url_values={"info_hash": info_hash},
+        debrid_token=debrid_token,
+    )
+    if not res:
+        return []
 
     cached_files: list[InstantFile] = [
         InstantFile(id=int(id_key), **file_info)
@@ -61,113 +89,74 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
     return cached_files
 
 
-@timestamped()
 async def list_torrents(debrid_token: str) -> list[TorrentInfo]:
-    api_url = f"{ROOT_URL}/torrents"
-    async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.get(api_url, headers=api_headers) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error getting torrent list",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return []
-            response_json = await response.json()
+    response_json = await make_request(
+        method="GET",
+        url="/torrents",
+        debrid_token=debrid_token,
+    )
+    if not response_json:
+        return []
     return [TorrentInfo(**t) for t in response_json]
 
 
-@timestamped()
 async def get_torrent_info(
     torrent_id: str,
     debrid_token: str,
 ) -> TorrentInfo | None:
-    api_url = f"{ROOT_URL}/torrents/info/{torrent_id}"
-    async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.get(api_url, headers=api_headers) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error getting torrent info",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return None
-            response_json = await response.json()
-            torrent_info: TorrentInfo = TorrentInfo(**response_json)
-            return torrent_info
+    response_json = await make_request(
+        method="GET",
+        url="/torrents/info/{torrent_id}",
+        url_values={"torrent_id": torrent_id},
+        debrid_token=debrid_token,
+    )
+    if not response_json:
+        return None
+
+    return TorrentInfo(**response_json)
 
 
-@timestamped()
 async def select_torrent_file(
     torrent_id: str,
     file_id: str,
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> bool:
-    async with aiohttp.ClientSession() as session:
-        for i in range(1, 5):
-            api_headers = {"Authorization": f"Bearer {debrid_token}"}
-            async with session.post(
-                f"{ROOT_URL}/torrents/selectFiles/{torrent_id}",
-                headers=api_headers,
-                data={"files": file_id},
-            ) as response:
-                if response.status not in range(200, 300):
-                    log.error(
-                        "Error selecting torrent file",
-                        status=response.status,
-                        reason=response.reason,
-                        body=await response.text(),
-                        attempt=i,
-                    )
-                    await asyncio.sleep(i)
-                return True
-    log.error("failed to select torrent file", torrent_id=torrent_id, file_id=file_id, attempts=5)
-    return False
+    await make_request(
+        method="POST",
+        url="/torrents/selectFiles/{torrent_id}",
+        url_values={"torrent_id": torrent_id},
+        debrid_token=debrid_token,
+        body={"files": file_id},
+    )
+    return True
 
 
-@timestamped()
 async def unrestrict_link(
     torrent: Torrent,
     link: str,
     debrid_token: str,
 ) -> UnrestrictedLink | None:
-    api_url = f"{ROOT_URL}/unrestrict/link"
-    body = {"link": link}
-
-    async with aiohttp.ClientSession() as session:
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.post(api_url, headers=api_headers, data=body) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error getting unrestrict link",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return None
-            unrestrict_response_json = await response.json()
-            unrestrict_response_json["torrent"] = torrent
-            unrestrict_info: UnrestrictedLink = UnrestrictedLink(**unrestrict_response_json)
-            log.info("Got unrestrict link", link=unrestrict_info.link, info_hash=torrent.info_hash)
-            return unrestrict_info
+    response_json = await make_request(
+        method="POST",
+        url="/unrestrict/link",
+        debrid_token=debrid_token,
+        body={"link": link},
+    )
+    if not response_json:
+        return None
+    response_json["torrent"] = torrent
+    unrestrict_info: UnrestrictedLink = UnrestrictedLink(**response_json)
+    log.info("Got unrestrict link", link=unrestrict_info.link, info_hash=torrent.info_hash)
+    return unrestrict_info
 
 
-@timestamped()
 async def delete_torrent(torrent_id: str, debrid_token: str):
-    async with aiohttp.ClientSession() as session:
-        api_url = f"{ROOT_URL}/torrents/delete/{torrent_id}"
-        api_headers = {"Authorization": f"Bearer {debrid_token}"}
-        async with session.delete(api_url, headers=api_headers) as response:
-            if response.status not in range(200, 300):
-                log.error(
-                    "Error deleting torrent",
-                    status=response.status,
-                    reason=response.reason,
-                    body=await response.text(),
-                )
-                return
+    response_json = await make_request(
+        method="DELETE",
+        url="/torrents/delete/{torrent_id}",
+        url_values={"torrent_id": torrent_id},
+        debrid_token=debrid_token,
+    )
+    if response_json:
+        log.info("Deleted torrent", torrent_id=torrent_id)

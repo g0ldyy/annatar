@@ -77,13 +77,11 @@ async def select_torrent_file_by_season_episode(
         torrent_file_id=torrent_file_id,
         season_episode=season_episode,
     )
-    api_url = f"{ROOT_URL}/torrents/selectFiles/{torrent_id}"
-    body = {"files": torrent_file_id}
 
-    selected: bool = api.select_torrent_file(
-        api_url=api_url,
+    selected: bool = await api.select_torrent_file(
         debrid_token=debrid_token,
-        body=body,
+        file_id=str(torrent_file_id),
+        torrent_id=torrent_id,
     )
     if selected:
         log.info("Selected torrent file", torrent_id=torrent_id, torrent_file_id=torrent_file_id)
@@ -102,6 +100,9 @@ async def get_torrent_link(info_hash: str, debrid_token: str) -> Optional[str]:
         if torrent.hash.lower() != info_hash.lower():
             continue
         if torrent.links:
+            if torrent.status != "downloaded":
+                log.error("torrent is not downloaded yet", status=torrent.status)
+                return None
             link = torrent.links[0]
             log.info("Torrent link found", link=link, info_hash=info_hash)
             return link
@@ -121,7 +122,7 @@ async def _get_stream_for_torrent(
 ) -> Optional[UnrestrictedLink]:
     torrent: Optional[Torrent] = await db.get_model(f"torrent:{info_hash}", model=Torrent)
     if not torrent:
-        log.error("No cached torrent not found", info_hash=info_hash)
+        log.error("cached torrent not found", info_hash=info_hash)
         return None
 
     torrent_id: Optional[str] = await api.add_magnet(
@@ -234,6 +235,8 @@ async def get_stream_link(
     # this route has to match the route provided to provide the 302
     # XXX How to get root url?
     url: str = f"/rd/{debrid_token}/{torrent.info_hash}/{file_id}"
+    # need this for lookup later
+    await db.set_model(key=f"torrent:{torrent.info_hash}", model=torrent, ttl=timedelta(weeks=8))
     return StreamLink(
         size=file.filesize,
         name=file.filename,

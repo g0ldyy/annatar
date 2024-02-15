@@ -14,13 +14,10 @@ from annatar import instrumentation
 log = structlog.get_logger(__name__)
 request_id = ContextVar("request_id", default="MISSING")
 
-REQUEST_DURATION_BUCKETS = [0.1, 0.25, 0.3, 0.5, 1.0, 1.2, 1.8, 2.0, 3.0, 5.0, 10.0, 15.0]
-
 REQUEST_DURATION = Histogram(
     name="request_duration_seconds",
     documentation="Duration of HTTP requests in seconds",
     labelnames=["method", "request_handler", "status"],
-    buckets=REQUEST_DURATION_BUCKETS,
     registry=instrumentation.REGISTRY,
 )
 

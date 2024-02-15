@@ -104,28 +104,10 @@ async def _search(
     return resp
 
 
-REQUEST_DURATION_BUCKETS = [
-    0.005,
-    0.010,
-    0.025,
-    0.050,
-    0.080,
-    0.100,
-    0.250,
-    0.500,
-    0.800,
-    1.500,
-    2.200,
-    4.000,
-    8.000,
-    12.000,
-]
-
 REQUEST_DURATION = Histogram(
     name="api_request_duration_seconds",
     documentation="Duration of API requests in seconds",
     labelnames=["type", "debrid_service", "cached", "error"],
-    buckets=REQUEST_DURATION_BUCKETS,
     registry=instrumentation.REGISTRY,
 )
 

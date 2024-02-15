@@ -19,6 +19,7 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Gauge,
+    Histogram,
     generate_latest,
     multiprocess,
 )
@@ -33,6 +34,13 @@ Gauge(
     registry=REGISTRY,
     labelnames=["version"],
 ).labels(version=os.getenv("BUILD_VERSION", "UNKNOWN")).set(1)
+
+HTTP_CLIENT_REQUEST_DURATION = Histogram(
+    name="http_client_request_duration_seconds",
+    documentation="Duration of Redis requests in seconds",
+    labelnames=["client", "method", "url", "status_code", "error"],
+    registry=REGISTRY,
+)
 
 
 async def metrics_handler(request: Request):
