@@ -2,6 +2,8 @@ import re
 
 import structlog
 
+from annatar.jackett_models import SearchQuery
+
 log = structlog.get_logger(__name__)
 
 PRIORITY_WORDS: list[str] = [r"\b(4K|2160p)\b", r"\b1080p\b", r"\b720p\b"]
@@ -93,8 +95,33 @@ def match_season_episode(season_episode: list[int], file: str) -> bool:
     return matches_season and matches_episode
 
 
+def get_season_range(name: str) -> list[int]:
+    match = re.search(rf"\bS(\d+)[-\s]S?(\d+)\b", name, re.IGNORECASE)
+    if match:
+        begin = int(match.group(1))
+        # python range ends are non-inclusive so +1
+        end = 1 + int(match.group(2))
+        if begin == end:
+            return [begin]
+        return list(range(begin, end))
+    elif match := re.search(rf"\bS(\d+)\b", name, re.IGNORECASE):
+        return [int(match.group(1))]
+    return []
+
+
+def has_season(name: str, season: str) -> bool:
+    season_range = get_season_range(name)
+    if season_range and int(season) in season_range:
+        return True
+    return False
+
+
+def has_episode(name: str, episode: str) -> bool:
+    return bool(re.search(rf"\bE0?{episode}\b", name, re.IGNORECASE))
+
+
 # sort items by quality
-def score_name(query: str, year: int, name: str) -> int:
+def score_name(query: SearchQuery, name: str) -> int:
     """
     Sort items by quality and how well they match the query pattern
     :param query: original search quality
@@ -102,11 +129,31 @@ def score_name(query: str, year: int, name: str) -> int:
     """
 
     score: int = 0
-    name_pattern: str = re.sub(r"\W+", r"\\W+", query)
+    name_pattern: str = re.sub(r"\W+", r"\\W+", query.name)
     if re.search(name_pattern, name, re.IGNORECASE):
+        # name match is highest priority
         score += 100
-    if re.search(rf"\W{year}\W", name):
+    if re.search(rf"\W{query.year}\W", name):
+        # year match is a good indicator and sometimes helps filter out
+        # rebooted series with the same name
         score += 20
+    if query.season:
+        # this is a series so we have to match on season and episode
+        seasons = get_season_range(name)
+        if len(seasons) > 1 and int(query.season) in seasons:
+            # this is likely a complete series so it should be highest priority
+            score += 100
+        elif has_season(name, query.season):
+            # This torrent contains this season either as a range or a single season
+            score += 50
+        else:
+            # This torrent does not contain this season
+            score -= 70
+        if query.episode and has_episode(name, query.episode):
+            # This torrent contains this episode explicitly, which is good, but
+            # not as good as a season match
+            score += 20
+    # finally we check the stream quality
     for index, quality in enumerate(reversed(PRIORITY_WORDS)):
         if re.search(quality, name, re.IGNORECASE):
             score += index * 5

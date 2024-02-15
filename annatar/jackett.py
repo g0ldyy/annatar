@@ -58,8 +58,7 @@ async def search_indexer(
     suffixes: list[str] = [str(search_query.year)]
     if search_query.type == "series":
         suffixes = [
-            f"S{str(search_query.season).zfill(2)}",
-            f"S{str(search_query.season).zfill(2)} E{str(search_query.episode).zfill(2)}",
+            f"",
         ]
 
     tasks = [
@@ -108,8 +107,7 @@ async def search_indexer(
             sorted(
                 list(torrents.values()),
                 key=lambda t: human.score_name(
-                    search_query.name,
-                    search_query.year,
+                    search_query,
                     t.title,
                 ),
             )

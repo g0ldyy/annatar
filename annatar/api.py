@@ -81,7 +81,7 @@ async def _search(
         reversed(
             sorted(
                 links,
-                key=lambda x: human.score_name(q.name, q.year, x.name),
+                key=lambda x: human.score_name(q, x.name),
             )
         )
     )

@@ -109,7 +109,11 @@ async def get_torrent_link(info_hash: str, debrid_token: str) -> Optional[str]:
         else:
             # this typically means that the torrent isn't actually instantaly available
             # despite rd saying so. Sucks, but it is what it is.
-            log.info("Torrent has no links.", torrent=torrent, info_hash=info_hash)
+            log.error(
+                "Torrent has no links. It is not instantly available after all...",
+                torrent=torrent,
+                info_hash=info_hash,
+            )
             return None
     log.info("Torrent not found in list", info_hash=info_hash)
     return None
