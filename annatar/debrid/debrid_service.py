@@ -14,6 +14,10 @@ class DebridService(ABC):
         self.api_key = api_key
 
     @abstractmethod
+    def shared_cache(self) -> bool:
+        pass
+
+    @abstractmethod
     def short_name(self) -> str:
         pass
 

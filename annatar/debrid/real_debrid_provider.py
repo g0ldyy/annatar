@@ -19,6 +19,9 @@ class RealDebridProvider(DebridService):
     def id(self) -> str:
         return "real_debrid"
 
+    def shared_cache(self):
+        return True
+
     async def get_stream_links(
         self,
         torrents: list[Torrent],

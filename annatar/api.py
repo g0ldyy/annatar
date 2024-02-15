@@ -1,5 +1,6 @@
 import re
 from datetime import datetime, timedelta
+from hashlib import md5
 from typing import Optional
 
 import structlog
@@ -29,6 +30,14 @@ async def _search(
 ) -> StreamResponse:
     idx: str = "-".join(sorted(indexers))
     cache_key: str = f"api:search:{type}:{imdb_id}:{season_episode}:{debrid.id()}:{idx}"
+
+    if not debrid.shared_cache():
+        # since some debrid providers (RD) have to have goofy work arounds
+        # for getting direct links we have to cache the results only for their
+        # api key.
+        hashed_api_key: str = md5(debrid.api_key.encode()).hexdigest()
+        cache_key = f"{cache_key}:{hashed_api_key}"
+
     cached: Optional[StreamResponse] = await db.get_model(cache_key, StreamResponse)
     if cached:
         return StreamResponse(

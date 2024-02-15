@@ -17,6 +17,9 @@ class PremiumizeProvider(DebridService):
     def id(self) -> str:
         return "premiumize"
 
+    def shared_cache(self):
+        return False
+
     async def get_stream_links(
         self,
         torrents: list[Torrent],

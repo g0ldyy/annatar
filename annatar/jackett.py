@@ -54,20 +54,6 @@ async def get_indexers() -> list[Indexer]:
     return Indexer.all()
 
 
-async def cache_torrents(torrents: list[Torrent]) -> None:
-    tasks = [
-        asyncio.create_task(
-            db.set_model(
-                f"torrent:{torrent.info_hash}",
-                torrent,
-                ttl=timedelta(weeks=8),
-            )
-        )
-        for torrent in torrents
-    ]
-    await asyncio.gather(*tasks)
-
-
 async def search_indexer(
     search_query: SearchQuery,
     jackett_url: str,
