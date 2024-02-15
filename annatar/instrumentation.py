@@ -1,6 +1,7 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -14,31 +15,55 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Gauge,
+    generate_latest,
+    multiprocess,
+)
+
+# prometheus
+REGISTRY = CollectorRegistry()
+multiprocess.MultiProcessCollector(REGISTRY)
+
+Gauge("build_info", "build information", multiprocess_mode="livemin").set(1)
+
+
+async def metrics_handler(request: Request):
+    data = generate_latest(REGISTRY)
+    return Response(
+        content=data,
+        headers={"Content-Type": CONTENT_TYPE_LATEST, "Content-Length": str(len(data))},
+    )
+
 
 RedisInstrumentor().instrument()  # type: ignore
 OTEL_EXPORTER_OTLP_ENDPOINT: str = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+DISABLE_OTEL: bool = bool(os.environ.get("DISABLE_OTEL", "0"))
 SAMPLE_RATE: float = float(os.environ.get("TRACING_SAMPLE_RATIO", "0.05"))
 
-if OTEL_EXPORTER_OTLP_ENDPOINT:
-    # tracing
-    provider = TracerProvider(sampler=TraceIdRatioBased(SAMPLE_RATE))
-    processor = BatchSpanProcessor(OTLPSpanExporter())
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    # metrics
-    meter_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
-    metrics_provider = MeterProvider(metric_readers=[meter_reader])
-    metrics.set_meter_provider(metrics_provider)
-else:
-    # traces
-    provider = TracerProvider()
-    processor = BatchSpanProcessor(ConsoleSpanExporter())
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    # metrics
-    meter_reader = PeriodicExportingMetricReader(ConsoleMetricExporter())
-    metrics_provider = MeterProvider(metric_readers=[meter_reader])
-    metrics.set_meter_provider(metrics_provider)
+if not DISABLE_OTEL:
+    if OTEL_EXPORTER_OTLP_ENDPOINT:
+        # tracing
+        provider = TracerProvider(sampler=TraceIdRatioBased(SAMPLE_RATE))
+        processor = BatchSpanProcessor(OTLPSpanExporter())
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        # metrics
+        meter_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
+        metrics_provider = MeterProvider(metric_readers=[meter_reader])
+        metrics.set_meter_provider(metrics_provider)
+    else:
+        # traces
+        provider = TracerProvider()
+        processor = BatchSpanProcessor(ConsoleSpanExporter())
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        # metrics
+        meter_reader = PeriodicExportingMetricReader(ConsoleMetricExporter())
+        metrics_provider = MeterProvider(metric_readers=[meter_reader])
+        metrics.set_meter_provider(metrics_provider)
 
 
 def init():
@@ -46,4 +71,5 @@ def init():
 
 
 def instrument_fastapi(app: FastAPI):
-    FastAPIInstrumentor.instrument_app(app)  # type: ignore
+    if not DISABLE_OTEL:
+        FastAPIInstrumentor.instrument_app(app)  # type: ignore

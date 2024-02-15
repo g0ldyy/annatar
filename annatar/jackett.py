@@ -1,17 +1,17 @@
 import asyncio
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import aiohttp
 import structlog
+from prometheus_client import Histogram
 from structlog.contextvars import bound_contextvars
 
 from annatar import human
 from annatar.database import db
 from annatar.debrid import magnet
 from annatar.jackett_models import Indexer, SearchQuery, SearchResult, SearchResults
-from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
@@ -19,12 +19,34 @@ log = structlog.get_logger(__name__)
 MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
 JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
+REQUEST_DURATION_BUCKETS = [
+    0.050,
+    0.100,
+    0.250,
+    0.500,
+    0.750,
+    1.000,
+    1.700,
+    2.500,
+    5.000,
+    7.500,
+    10.000,
+    12.000,
+    15.000,
+]
+
+REQUEST_DURATION = Histogram(
+    name="jackett_request_duration_seconds",
+    documentation="Duration of Jackett requests in seconds",
+    labelnames=["method", "indexer", "status"],
+    buckets=REQUEST_DURATION_BUCKETS,
+)
+
 
 async def get_indexers() -> list[Indexer]:
     return Indexer.all()
 
 
-@timestamped()
 async def cache_torrents(torrents: list[Torrent]) -> None:
     tasks = [
         asyncio.create_task(
@@ -39,7 +61,6 @@ async def cache_torrents(torrents: list[Torrent]) -> None:
     await asyncio.gather(*tasks)
 
 
-@timestamped(["indexer", "imdb"])
 async def search_indexer(
     search_query: SearchQuery,
     jackett_url: str,
@@ -116,7 +137,6 @@ async def search_indexer(
     return prioritized_list
 
 
-@timestamped(["imdb", "jackett_url", "search_query", "max_results", "indexers"])
 async def search_indexers(
     search_query: SearchQuery,
     jackett_url: str,
@@ -161,47 +181,60 @@ async def execute_search(
     indexer: str,
     params: dict[str, Any],
 ) -> list[SearchResult]:
-    kvs: str = ":".join([f"{k}:{v}" for k, v in params.items()])
-    cache_key: str = f"jackett:indexer:{indexer}:search:{kvs}"
-    cached_results: SearchResults | None = await db.get_model(cache_key, SearchResults)
-    if cached_results:
-        return cached_results.Results
+    start_time = datetime.now()
+    response_status: int = 200
+    try:
+        kvs: str = ":".join([f"{k}:{v}" for k, v in params.items()])
+        cache_key: str = f"jackett:indexer:{indexer}:search:{kvs}"
+        cached_results: SearchResults | None = await db.get_model(cache_key, SearchResults)
+        if cached_results:
+            return cached_results.Results
 
-    url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
-    with bound_contextvars(
-        search_params=params,
-        url=url,
-        indexer=indexer,
-    ):
-        params["apikey"] = jackett_api_key
-        async with aiohttp.ClientSession() as session:
-            log.info("searching jackett")
-            try:
-                async with session.get(
-                    url=url,
-                    params=params,
-                    timeout=JACKETT_TIMEOUT,
-                    headers={"Accept": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        log.error(
-                            "jacket search failed",
-                            status=response.status,
-                            reason=response.reason,
-                            body=await response.text(),
-                        )
-                        return []
-                    response_json = await response.json()
-            except TimeoutError as err:
-                log.error("jacket search timeout", error=err, timeout=JACKETT_TIMEOUT)
-                return []
+        url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
+        with bound_contextvars(
+            search_params=params,
+            url=url,
+            indexer=indexer,
+        ):
+            params["apikey"] = jackett_api_key
+            async with aiohttp.ClientSession() as session:
+                log.info("searching jackett")
+                try:
+                    async with session.get(
+                        url=url,
+                        params=params,
+                        timeout=JACKETT_TIMEOUT,
+                        headers={"Accept": "application/json"},
+                    ) as response:
+                        response_status = response.status
+                        if response.status != 200:
+                            log.error(
+                                "jacket search failed",
+                                status=response.status,
+                                reason=response.reason,
+                                body=await response.text(),
+                            )
+                            return []
+                        response_json = await response.json()
+                except TimeoutError as err:
+                    log.error("jacket search timeout", error=err, timeout=JACKETT_TIMEOUT)
+                    return []
+                except Exception as err:
+                    log.error("jacket search error", error=err)
+                    return []
 
-    res: SearchResults = SearchResults(
-        Results=[SearchResult(**result) for result in response_json["Results"]]
-    )
-    if res.Results:
-        await db.set_model(cache_key, res, timedelta(days=1))
-    return res.Results
+        res: SearchResults = SearchResults(
+            Results=[SearchResult(**result) for result in response_json["Results"]]
+        )
+        if res.Results:
+            await db.set_model(cache_key, res, timedelta(days=1))
+        return res.Results
+    finally:
+        status = f"{response_status // 100}xx"
+        REQUEST_DURATION.labels("indexer_search", indexer, status).observe(
+            amount=(datetime.now() - start_time).total_seconds(),
+            exemplar={"category": params.get("Category", ""), "query": params.get("Query", "")},
+        )
 
 
 async def map_matched_result(
@@ -266,7 +299,6 @@ async def map_matched_result(
     return None
 
 
-@timestamped(["guid", "link"])
 async def resolve_magnet_link(guid: str, link: str) -> str | None:
     """
     Jackett sometimes does not have a magnet link but a local URL that
@@ -284,11 +316,14 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
         return cached_magnet
 
     log.info("magnet resolve: following redirect", guid=guid, link=link)
+    start_time = datetime.now()
+    response_status: int = 200
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 link, allow_redirects=False, timeout=JACKETT_TIMEOUT
             ) as response:
+                response_status = response.status
                 if response.status == 302:
                     location = response.headers.get("Location", "")
                     log.info("magnet resolve: found redirect", guid=guid, magnet=location)
@@ -300,3 +335,11 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
     except TimeoutError as err:
         log.error("magnet resolve: timeout", guid=guid, error=err)
         return None
+    except Exception as err:
+        log.error("magnet resolve error", error=err)
+        return None
+    finally:
+        status = f"{response_status // 100}xx"
+        REQUEST_DURATION.labels("magnet_resolve", None, status).observe(
+            amount=(datetime.now() - start_time).total_seconds(),
+        )

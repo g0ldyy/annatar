@@ -1,12 +1,12 @@
+import asyncio
 import os
 from datetime import timedelta
 from typing import Optional, Type, TypeVar
 
 import structlog
+from prometheus_client import Histogram
 from pydantic import BaseModel, ValidationError
 from redislite import StrictRedis  # type: ignore
-
-from annatar.logging import timestamped
 
 log = structlog.get_logger(__name__)
 
@@ -19,13 +19,31 @@ redis: StrictRedis = (
     StrictRedis(host=REDIS_URL, **REDIS_FLAGS) if REDIS_URL else StrictRedis(DB_PATH, **REDIS_FLAGS)
 )
 
-if REDIS_URL:
-    log.info("connected to redis", host=REDIS_URL)
-    redis.ping()
-else:
-    log.info("running with local redis", storage=DB_PATH)
+REQUEST_DURATION_BUCKETS = [
+    0.001,
+    0.005,
+    0.010,
+    0.025,
+    0.050,
+    0.100,
+    0.250,
+    0.500,
+    0.750,
+    1.000,
+    1.700,
+    2.500,
+    5.000,
+]
+
+REQUEST_DURATION = Histogram(
+    name="redis_command_duration_seconds",
+    documentation="Duration of Redis requests in seconds",
+    labelnames=["command"],
+    buckets=REQUEST_DURATION_BUCKETS,
+)
 
 
+@REQUEST_DURATION.labels("PING").time()
 async def ping() -> bool:
     redis.ping()
     return True
@@ -46,7 +64,7 @@ async def set_model(key: str, model: BaseModel, ttl: timedelta) -> bool:
     return await set(key, model.model_dump_json(), ttl=ttl)
 
 
-@timestamped(["key"])
+@REQUEST_DURATION.labels("SET").time()
 async def set(key: str, value: str, ttl: timedelta) -> bool:
     try:
         if redis.set(key, value, ex=int(ttl.total_seconds())):
@@ -57,7 +75,7 @@ async def set(key: str, value: str, ttl: timedelta) -> bool:
         return False
 
 
-@timestamped(["key"])
+@REQUEST_DURATION.labels("GET").time()
 async def get(key: str) -> Optional[str]:
     try:
         res: Optional[bytes] = redis.get(key)  # type: ignore
@@ -69,3 +87,10 @@ async def get(key: str) -> Optional[str]:
     except Exception as e:
         log.error("failed to get cache", key=key, error=str(e))
         return None
+
+
+if REDIS_URL:
+    log.info("connected to redis", host=REDIS_URL)
+    asyncio.create_task(ping())
+else:
+    log.info("running with local redis", storage=DB_PATH)

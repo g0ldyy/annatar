@@ -21,6 +21,7 @@ opentelemetry-exporter-otlp = "^1.22.0"
 opentelemetry-instrumentation-aiohttp-client = "^0.43b0"
 opentelemetry-instrumentation-fastapi = "^0.43b0"
 opentelemetry-instrumentation-redis = "^0.43b0"
+prometheus-client = "^0.20.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.1.0"
