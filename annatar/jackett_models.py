@@ -27,7 +27,7 @@ class Category(BaseModel):
         return None
 
 
-MOVIES = Category(name="movies", id=2000)
+MOVIES = Category(name="movie", id=2000)
 SERIES = Category(name="series", id=5000)
 
 
