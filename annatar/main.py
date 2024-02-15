@@ -13,8 +13,11 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # XXX These are executed in reverse order
+app.add_middleware(middleware.Metrics)
 app.add_middleware(middleware.RequestLogger)
 app.add_middleware(middleware.RequestID)
+
+app.add_route("/metrics", instrumentation.metrics_handler)
 
 
 # handle CORS preflight requests

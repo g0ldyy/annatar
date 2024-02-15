@@ -90,7 +90,7 @@ async def get_rd_stream(
     response_model=StreamResponse,
     response_model_exclude_none=True,
 )
-async def search(
+async def list_streams(
     request: Request,
     type: MediaType,
     id: Annotated[

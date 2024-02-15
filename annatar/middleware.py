@@ -5,11 +5,45 @@ from typing import Any, Callable
 
 import structlog
 from fastapi import Request, Response
+from prometheus_client import Histogram
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 log = structlog.get_logger(__name__)
 request_id = ContextVar("request_id", default="MISSING")
+
+REQUEST_DURATION_BUCKETS = [0.1, 0.25, 0.3, 0.5, 1.0, 1.2, 1.8, 2.0, 3.0, 5.0, 10.0, 15.0]
+
+REQUEST_DURATION = Histogram(
+    name="request_duration_seconds",
+    documentation="Duration of HTTP requests in seconds",
+    labelnames=["method", "request_handler", "status"],
+    buckets=REQUEST_DURATION_BUCKETS,
+)
+
+
+def get_route_handler(request: Request) -> str | None:
+    for route in request.app.routes:
+        match, _child_scope = route.matches(request.scope)
+        # Enum value 2 represents the route template Match.FULL
+        if match.value == 2:
+            return route.name
+    return None
+
+
+class Metrics(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+        start_time = datetime.now()
+        resp: Response = await call_next(request)
+        request_time = datetime.now() - start_time
+        status_code = f"{str(resp.status_code)[0]}xx"
+        handler = get_route_handler(request)
+        method = request.method
+        if handler:
+            REQUEST_DURATION.labels(method, handler, status_code).observe(
+                request_time.total_seconds()
+            )
+        return resp
 
 
 class RequestID(BaseHTTPMiddleware):

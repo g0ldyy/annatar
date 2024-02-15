@@ -7,6 +7,7 @@ BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
 HOST: str = os.getenv("LISTEN_HOST", "0.0.0.0")
 PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
 WORKERS = int(os.getenv("WORKERS", 2 * NUM_CORES))
+PROM_DIR = os.getenv("PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{os.getpid()}")
 
 
 if __name__ == "__main__":
@@ -21,6 +22,8 @@ if __name__ == "__main__":
         )
         os.environ["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(resource_attrs)
 
+    os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
+    os.mkdir(PROM_DIR)
     uvicorn.run(
         "annatar.main:app",
         host=HOST,
