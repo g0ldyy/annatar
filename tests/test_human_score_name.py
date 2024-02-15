@@ -1,169 +1,65 @@
-import pytest
-from pydantic import BaseModel
-
 from annatar.human import score_name
 from annatar.jackett_models import SearchQuery
 
 
-class PriorityTest(BaseModel):
-    query: SearchQuery
-    filename: str
-    expected_score: int
+def test_sorting_series_by_score_names():
+    search_query = SearchQuery(
+        name="Friends",
+        year=1994,
+        type="series",
+        season="5",
+        episode="10",
+    )
+
+    torrents = [
+        "Friends S01-S10 COMPLETE 4k",
+        "Friends S01-S10 COMPLETE 1080p",
+        "Friends S01-S10 1080p",
+        "Friends S05 COMPLETE 2160p",
+        "Friends S01-S10 COMPLETE",
+        "Friends S5",
+        "Friends S05E10 1080p",
+        "Friends S3",
+        "Friends S01-S3",
+        "Best Friends S01-S10 2160p",
+        "The Office S01-S10 1080p",
+        "The Office S5E10",
+    ]
+
+    results = sorted(
+        torrents,
+        key=lambda t: score_name(search_query, t),
+        reverse=True,
+    )
+
+    assert results == torrents
 
 
-test_movie_data: dict[str, PriorityTest] = {
-    "no_match": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="no match whatsoever",
-        expected_score=0,
-    ),
-    "year_only": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Another movie in 1995.avi",
-        expected_score=20,
-    ),
-    "quality_only": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Another movie in 1985 1080p.avi",
-        expected_score=5,
-    ),
-    "name_only_match": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.s01.e02.mkv",
-        expected_score=100,
-    ),
-    "name_2160p": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.2160p.mkv",
-        expected_score=110,
-    ),
-    "name_4k": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.4k.mkv",
-        expected_score=110,
-    ),
-    "name_1080p": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.1080p.mkv",
-        expected_score=105,
-    ),
-    "name_year": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.1995.mkv",
-        expected_score=120,
-    ),
-    "name_year_2160p": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.2160p.1995.mkv",
-        expected_score=130,
-    ),
-    "name_year_1080p": PriorityTest(
-        query=SearchQuery(name="Jumanji", year=1995, type="movie"),
-        filename="Jumanji.1080p.1995.mkv",
-        expected_score=125,
-    ),
-}
+def test_sorting_movies_by_score_names():
+    search_query = SearchQuery(
+        name="Pirates of the Caribbean: Dead Man's Chest",
+        year=2006,
+        type="movie",
+    )
 
+    torrents = [
+        "Pirates of the Caribbean Dead Man's Chest (2006) (2160p DSNP WEBRip x265 HEVC 10bit EAC3",
+        "Pirates of the Caribbean Dead Man's Chest (2006) 2160p BRRip 5.1 10Bit x265 -YTS",
+        "Pirates of the Caribbean: Dead Man's Chest 2006 2160p bluray YTS",
+        "Pirates of the Caribbean Dead Man s Chest 2006 1080p H264 DolbyD 5 1 nickarad",
+        "Pirates of the Caribbean Dead Man s Chest 2006 1080p BrRip x264 YIFY",
+        "Pirates of the Caribbean: Dead Man's Chest (2006) 1080p BrRip x2",
+        "Pirates of the Caribbean Dead Man s Chest 2006 1080p 10bit Bluray x265 HEVC Org NF DDP",
+        "Pirates of the Caribbean Dead Man's Chest (2006) 720p BRRip x264 -YTS",
+        "Pirates of the Caribbean: Dead Man's Chest (2006) 720p BrRip x26...",
+        "Pirates of the Caribbean: Dead Man's Chest (2032) 4K BrRip x26...",
+        "Piratess eat dead things in 4K 2006",
+    ]
 
-@pytest.mark.parametrize("name, t", test_movie_data.items())
-def test_movies(name: str, t: PriorityTest):
-    result: int = score_name(t.query, t.filename)
-    assert result == t.expected_score
+    results = sorted(
+        torrents,
+        key=lambda t: score_name(search_query, t),
+        reverse=True,
+    )
 
-
-test_series_data: dict[str, PriorityTest] = {
-    "no_match": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="no match whatsoever",
-        expected_score=-70,
-    ),
-    "match name and season": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files.s02.e05.mkv",
-        expected_score=170,
-    ),
-    "match name, year, season": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files.s02.e05.1993.mkv",
-        expected_score=190,
-    ),
-    "complete series with dash": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files S01-S10 COMPLETE SEASON",
-        expected_score=200,
-    ),
-    "complete series space": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files S01 S10 COMPLETE SEASON",
-        expected_score=200,
-    ),
-    "season range inclusive": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files S01 S02 COMPLETE SEASON",
-        expected_score=200,
-    ),
-    "season range non-inclusive": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="4",
-            episode="5",
-        ),
-        filename="The X-Files S01 S02 COMPLETE SEASON",
-        expected_score=30,
-    ),
-    "single season": PriorityTest(
-        query=SearchQuery(
-            name="The X-Files",
-            year=1993,
-            type="series",
-            season="2",
-            episode="5",
-        ),
-        filename="The X-Files S02",
-        expected_score=150,
-    ),
-}
-
-
-@pytest.mark.parametrize("name, t", test_series_data.items())
-def test_function(name: str, t: PriorityTest):
-    result: int = score_name(t.query, t.filename)
-    assert result == t.expected_score
+    assert results == torrents

@@ -62,7 +62,7 @@ async def _search(
         q.episode = str(season_episode[1])
 
     torrents: list[Torrent] = await jackett.search_indexers(
-        max_results=max(10, max_results),
+        max_results=max(30, max_results),
         jackett_url=jackett_url,
         jackett_api_key=jackett_api_key,
         search_query=q,
@@ -78,11 +78,10 @@ async def _search(
     )
 
     sorted_links: list[StreamLink] = list(
-        reversed(
-            sorted(
-                links,
-                key=lambda x: human.score_name(q, x.name),
-            )
+        sorted(
+            links,
+            key=lambda x: human.score_by_quality(x.name),
+            reverse=True,
         )
     )
 

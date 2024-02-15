@@ -30,7 +30,7 @@ JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 REQUEST_DURATION = Histogram(
     name="jackett_request_duration_seconds",
     documentation="Duration of Jackett requests in seconds",
-    labelnames=["method", "indexer", "status"],
+    labelnames=["method", "indexer", "status", "cached"],
     registry=instrumentation.REGISTRY,
 )
 
@@ -46,8 +46,12 @@ async def search_indexer(
     indexer: str,
     imdb: int | None = None,
 ) -> list[Torrent]:
-    cache_key: str = (
-        f"jackett:indexer:{indexer}:search:{search_query.type}:{search_query.name}:{search_query.year}:{search_query.season}:{search_query.episode}"
+    suffix: str = "" if search_query.type == "series" else f"{search_query.year}"
+    cache_key: str = ":".join(
+        [
+            f"jackett:indexer:{indexer}:search:{search_query.type}:{search_query.name}",
+            suffix,
+        ]
     )
     cached_torrents: Torrents | None = await db.get_model(cache_key, Torrents)
     if cached_torrents:
@@ -55,27 +59,20 @@ async def search_indexer(
 
     sanitized_name: str = re.sub(r"\W", " ", search_query.name)
     category: str = "2000" if search_query.type == "movie" else "5000"
-    suffixes: list[str] = [str(search_query.year)]
-    if search_query.type == "series":
-        suffixes = [
-            f"",
-        ]
 
-    tasks = [
-        execute_search(
-            jackett_api_key=jackett_api_key,
-            jackett_url=jackett_url,
-            indexer=indexer,
-            params={
-                "Category": category,
-                "Query": f"{sanitized_name} {suffix}".strip(),
-                "Tracker[]": indexer,
-            },
-        )
-        for suffix in suffixes
-    ]
+    raw_results: list[SearchResult] = await execute_search(
+        jackett_api_key=jackett_api_key,
+        jackett_url=jackett_url,
+        indexer=indexer,
+        params={
+            "Category": category,
+            "Query": f"{sanitized_name} {suffix}",
+            "Tracker[]": indexer,
+        },
+    )
+
     search_results: list[SearchResult] = sorted(
-        [item for sublist in await asyncio.gather(*tasks) for item in sublist],
+        raw_results,
         key=lambda r: r.Seeders,
         reverse=True,
     )
@@ -88,7 +85,7 @@ async def search_indexer(
 
     for task in asyncio.as_completed(tasks):
         torrent: Optional[Torrent] = await task
-        if torrent:
+        if torrent and human.score_name(search_query, torrent.title) > 0:
             torrents[torrent.info_hash] = torrent
             await db.set_model(
                 key=f"torrent:{torrent.info_hash}", model=torrent, ttl=timedelta(weeks=8)
@@ -103,19 +100,17 @@ async def search_indexer(
 
     # prioritize items by quality
     prioritized_list: list[Torrent] = list(
-        reversed(
-            sorted(
-                list(torrents.values()),
-                key=lambda t: human.score_name(
-                    search_query,
-                    t.title,
-                ),
-            )
+        sorted(
+            list(torrents.values()),
+            key=lambda t: human.score_name(
+                search_query,
+                t.title,
+            ),
+            reverse=True,
         )
     )
 
-    if len(prioritized_list) > 0:
-        await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=7))
+    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=7))
 
     return prioritized_list
 
@@ -146,7 +141,7 @@ async def search_indexers(
     for task in asyncio.as_completed(tasks):
         indexer_results: list[Torrent] = await task
         for torrent in indexer_results:
-            if torrent:
+            if torrent and human.score_name(search_query, torrent.title) > 0:
                 torrents[torrent.info_hash] = torrent
                 if len(torrents) >= max_results:
                     break
@@ -166,11 +161,13 @@ async def execute_search(
 ) -> list[SearchResult]:
     start_time = datetime.now()
     response_status: int = 200
+    cached_response: bool = False
     try:
         kvs: str = ":".join([f"{k}:{v}" for k, v in params.items()])
         cache_key: str = f"jackett:indexer:{indexer}:search:{kvs}"
         cached_results: SearchResults | None = await db.get_model(cache_key, SearchResults)
         if cached_results:
+            cached_response = True
             return cached_results.Results
 
         url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
@@ -214,7 +211,12 @@ async def execute_search(
         return res.Results
     finally:
         status = f"{response_status // 100}xx"
-        REQUEST_DURATION.labels("indexer_search", indexer, status).observe(
+        REQUEST_DURATION.labels(
+            method="indexer_search",
+            indexer=indexer,
+            status=status,
+            cached=cached_response,
+        ).observe(
             amount=(datetime.now() - start_time).total_seconds(),
             exemplar={"category": params.get("Category", ""), "query": params.get("Query", "")},
         )
@@ -292,16 +294,17 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
     if link.startswith("magnet"):
         return link
 
-    cache_key: str = f"jackett:magnet:{guid}:url"
-    cached_magnet: Optional[str] = await db.get(cache_key)
-    if cached_magnet:
-        log.debug("magnet resolved", guid=guid)
-        return cached_magnet
-
-    log.info("magnet resolve: following redirect", guid=guid, link=link)
     start_time = datetime.now()
     response_status: int = 200
+    cached_response: bool = False
     try:
+        cache_key: str = f"jackett:magnet:{guid}:url"
+        cached_magnet: Optional[str] = await db.get(cache_key)
+        if cached_magnet:
+            cached_response = True
+            return cached_magnet
+
+        log.info("magnet resolve: following redirect", guid=guid, link=link)
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 link, allow_redirects=False, timeout=JACKETT_TIMEOUT
@@ -323,6 +326,11 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
         return None
     finally:
         status = f"{response_status // 100}xx"
-        REQUEST_DURATION.labels("magnet_resolve", None, status).observe(
+        REQUEST_DURATION.labels(
+            method="magnet_resolve",
+            indexer=None,
+            status=status,
+            cached=cached_response,
+        ).observe(
             amount=(datetime.now() - start_time).total_seconds(),
         )
