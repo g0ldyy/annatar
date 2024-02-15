@@ -62,7 +62,7 @@ async def _search(
         q.episode = str(season_episode[1])
 
     torrents: list[Torrent] = await jackett.search_indexers(
-        max_results=max(30, max_results),
+        max_results=max(10, max_results),
         jackett_url=jackett_url,
         jackett_api_key=jackett_api_key,
         search_query=q,
