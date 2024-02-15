@@ -16,6 +16,7 @@ def test_sorting_series_by_score_names():
         "Friends S01-S10 COMPLETE 1080p",
         "Friends S01-S10 1080p",
         "Friends S05 COMPLETE 2160p",
+        "Friends Season 1 10 COMPLETE",
         "Friends S01-S10 COMPLETE",
         "Friends S5",
         "Friends S05E10 1080p",

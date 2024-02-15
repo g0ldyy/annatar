@@ -96,7 +96,9 @@ def match_season_episode(season_episode: list[int], file: str) -> bool:
 
 
 def get_season_range(name: str) -> list[int]:
-    match = re.search(rf"\bS(\d+)[-\s]S?(\d+)\b", name, re.IGNORECASE)
+    match = re.search(rf"\bS(\d+)[-\s]S?(\d+)\b", name, re.IGNORECASE) or re.search(
+        rf"\bSeason\W(\d+)\W(\d+)\b", name, re.IGNORECASE
+    )
     if match:
         begin = int(match.group(1))
         # python range ends are non-inclusive so +1

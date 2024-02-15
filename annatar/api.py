@@ -13,7 +13,6 @@ from annatar.debrid.providers import DebridService
 from annatar.jackett_models import Indexer, SearchQuery
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
-from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
@@ -61,8 +60,7 @@ async def _search(
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
 
-    torrents: list[Torrent] = await jackett.search_indexers(
-        max_results=max(10, max_results),
+    async_torrents = jackett.search_indexers(
         jackett_url=jackett_url,
         jackett_api_key=jackett_api_key,
         search_query=q,
@@ -71,11 +69,15 @@ async def _search(
         indexers=[Indexer.find_by_id(i) for i in indexers],
     )
 
-    links: list[StreamLink] = await debrid.get_stream_links(
-        torrents=torrents,
+    links: list[StreamLink] = []
+
+    async for link in debrid.get_stream_links(
+        torrents=async_torrents,
         season_episode=season_episode,
         max_results=max_results,
-    )
+    ):
+        if human.score_by_quality(link.name) > 0:
+            links.append(link)
 
     sorted_links: list[StreamLink] = list(
         sorted(

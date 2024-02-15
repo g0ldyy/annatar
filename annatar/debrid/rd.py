@@ -1,6 +1,6 @@
 import asyncio
 from datetime import timedelta
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 import structlog
 
@@ -250,12 +250,12 @@ async def get_stream_link(
 
 @timestamped()
 async def get_stream_links(
-    torrents: list[Torrent],
+    torrents: AsyncGenerator[Torrent, None],
     debrid_token: str,
     season_episode: list[int] = [],
     max_results: int = 5,
     timeout: int = 10,
-) -> list[StreamLink]:
+) -> AsyncGenerator[StreamLink, None]:
     """
     Generates a list of RD links for each torrent link.
     """
@@ -269,13 +269,14 @@ async def get_stream_links(
                 debrid_token=debrid_token,
             )
         )
-        for torrent in torrents
+        async for torrent in torrents
     ]
 
     for task in asyncio.as_completed(tasks, timeout=timeout):
         link: Optional[StreamLink] = await task
-        if link:
+        if link and link.url not in links:
             links[link.url] = link
+            yield link
             if len(links) >= max_results:
                 break
 
@@ -283,5 +284,3 @@ async def get_stream_links(
     for task in tasks:
         if not task.done():
             task.cancel()
-
-    return list(links.values())

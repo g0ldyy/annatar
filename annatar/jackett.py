@@ -2,7 +2,7 @@ import asyncio
 import os
 import re
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import aiohttp
 import structlog
@@ -13,6 +13,8 @@ from annatar import human, instrumentation
 from annatar.database import db
 from annatar.debrid import magnet
 from annatar.jackett_models import (
+    MOVIES,
+    SERIES,
     Indexer,
     SearchQuery,
     SearchResult,
@@ -23,7 +25,7 @@ from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
-MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
+MAX_RESULTS_PER_INDEXER = int(os.environ.get("JACKETT_MAX_RESULTS", 10))
 JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
 
@@ -58,7 +60,7 @@ async def search_indexer(
         return cached_torrents.items
 
     sanitized_name: str = re.sub(r"\W", " ", search_query.name)
-    category: str = "2000" if search_query.type == "movie" else "5000"
+    category: str = str(MOVIES.id if search_query.type == "movie" else SERIES.id)
 
     raw_results: list[SearchResult] = await execute_search(
         jackett_api_key=jackett_api_key,
@@ -110,7 +112,23 @@ async def search_indexer(
         )
     )
 
-    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=7))
+    # cache for 7 days if we found something, otherwise cache for 1 day
+    # since it's unlikely we will find anything new within 24h
+    ttl_days = 7 if len(prioritized_list) > 0 else 1
+
+    # if the release is older than 1 year, cache for longer since the liklihood
+    # we will find a better release is lower as time goes on
+    year_diff = datetime.now().year - search_query.year
+    if search_query.year and year_diff > 1:
+        multiplier = 3 * year_diff
+        # don't care any more than 60 days though
+        ttl_days = min(60, ttl_days * multiplier)
+        log.info(
+            "this is an old release, caching for longer",
+            days=ttl_days,
+            release_year=search_query.year,
+        )
+    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=ttl_days))
 
     return prioritized_list
 
@@ -119,13 +137,12 @@ async def search_indexers(
     search_query: SearchQuery,
     jackett_url: str,
     jackett_api_key: str,
-    max_results: int,
     imdb: int | None = None,
     timeout: int = 60,
     indexers: list[Indexer] = Indexer.all(),
-) -> list[Torrent]:
+) -> AsyncGenerator[Torrent, None]:
     log.info("searching indexers", indexers=indexers)
-    torrents: dict[str, Torrent] = {}
+    info_hashes: dict[str, bool] = {}
     tasks = [
         asyncio.create_task(
             search_indexer(
@@ -137,20 +154,21 @@ async def search_indexers(
             )
         )
         for indexer in indexers
+        if indexer.supports(search_query.type)
     ]
     for task in asyncio.as_completed(tasks):
         indexer_results: list[Torrent] = await task
-        for torrent in indexer_results:
+        for torrent in indexer_results[:MAX_RESULTS_PER_INDEXER]:
+            if torrent.info_hash in info_hashes:
+                continue
             if torrent and human.score_name(search_query, torrent.title) > 0:
-                torrents[torrent.info_hash] = torrent
-                if len(torrents) >= max_results:
-                    break
+                info_hashes[torrent.info_hash] = True
+                yield torrent
 
     for task in tasks:
         if not task.done():
+            log.error("cancel task")
             task.cancel()
-
-    return list(torrents.values())
 
 
 async def execute_search(
