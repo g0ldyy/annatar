@@ -1,30 +1,37 @@
-BUILD_ARCH   ?= linux/amd64
-DOCKERFILE   ?= Dockerfile
-DOCKER_IMAGE ?= annatar:latest
+IMAGE_NAME ?= annatar
+IMAGE_TAG  ?= latest
+BUILD_ARCH ?= linux/amd64
+ARCHS       = amd64 arm64
 
 ifdef CI_REGISTRY_IMAGE
-	DOCKER_IMAGE = $(CI_REGISTRY_IMAGE):$(IMAGE_TAG)
+	IMAGE_NAME := $(CI_REGISTRY_IMAGE)
 endif
 
-# set this to --push if you want the image to be pushed  or --load to just load
-# it into the registry
-PUSH_OR_LOAD ?= --load
+ARCH_SUFFIX      = $(shell echo $(BUILD_ARCH) | cut -d '/' -f2)
+DOCKERFILE      ?= Dockerfile.$(ARCH_SUFFIX)
+DOCKER_PUSH     ?= --load # set this to --push to push --load to load it into the local registry
+DOCKER_TAG      := $(IMAGE_NAME):$(IMAGE_TAG)
+DOCKER_TAG_ARCH := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 
+
+# Build and push container for BUILD_ARCH
 container:
-	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-	docker buildx inspect mybuilder || docker buildx create --use --name mybuilder
-	docker buildx inspect --bootstrap
-	docker buildx build --platform $(BUILD_ARCH) \
-		$(PUSH_OR_LOAD) \
-		--cache-from $(DOCKER_IMAGE) \
-		--pull \
-		-f $(DOCKERFILE) \
-		--tag $(DOCKER_IMAGE) \
+	docker build --platform $(BUILD_ARCH) \
 		--build-arg BUILD_VERSION=$(shell git rev-parse HEAD) \
-		.
+		$(DOCKER_PUSH) \
+		--cache-from $(DOCKER_TAG_ARCH) \
+		-f $(DOCKERFILE) \
+		-t $(DOCKER_TAG_ARCH) .
 
+
+# Create and push the docker manifest for all architectures
+docker-manifest:
+	docker manifest create $(DOCKER_TAG) $(foreach arch,$(ARCHS),$(DOCKER_TAG)-$(arch))
+	$(foreach arch,$(ARCHS),docker manifest annotate $(DOCKER_TAG) $(DOCKER_TAG)-$(arch) --arch $(arch) ;)
+	docker manifest push $(DOCKER_TAG)
 
 test:
 	poetry run isort --check --diff annatar run.py
 	poetry run black --check --diff annatar run.py
 	poetry run pytest
+
