@@ -1,20 +1,49 @@
 stages:
-  - build
-  - push
+  - test
+  - docker
 
 variables:
   DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
 
-before_script:
-  - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
-  - echo "Image tag set to $IMAGE_TAG"
+test:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - apt-get update && apt-get install make
+    - pip install poetry
+    - poetry install
+    - make test
 
-build_and_push:
-  stage: build
+amd64_build:
+  stage: docker
   image: docker:latest
   services:
     - docker:dind
-  script:
-    - docker build --build-arg BUILD_VERSION=$CI_COMMIT_SHORT_SHA -t $DOCKER_IMAGE_NAME:$IMAGE_TAG .
+  variables:
+    BUILD_ARCH: linux/amd64
+    DOCKERFILE: Dockerfile
+    PUSH_OR_LOAD: --push
+  before_script:
+    - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
+    - echo "Image tag set to $IMAGE_TAG"
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $DOCKER_IMAGE_NAME:$IMAGE_TAG
+  script:
+    - apk add --no-cache make git
+    - make container
+
+arm64_build:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    BUILD_ARCH: linux/arm64
+    DOCKERFILE: Dockerfile.arm64
+    PUSH_OR_LOAD: --push
+  before_script:
+    - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
+    - echo "Image tag set to $IMAGE_TAG"
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - apk add --no-cache qemu qemu-img git make
+    - make container
