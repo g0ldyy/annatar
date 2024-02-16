@@ -1,0 +1,44 @@
+# --- Build Stage ---
+# Use the official Python 3.11 image as a base
+FROM python:3.11 as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+# ENV POETRY_VERSION 1.7.1
+ENV NUM_WORKERS 1
+
+# Install Poetry
+RUN python3 -mpip install --upgrade pip
+RUN pip install poetry
+
+# Set the working directory in the builder stage
+WORKDIR /app
+
+# Copy the pyproject.toml and poetry.lock files
+COPY pyproject.toml poetry.lock* /app/
+
+# Install runtime dependencies using Poetry
+# --no-dev: Skip installing development dependencies
+# --no-root: Skip installing the root package (your package) at this stage
+# --no-interaction: Do not prompt for input
+# --no-ansi: Disable ANSI output
+RUN poetry config virtualenvs.create false \
+    && poetry install --only main --no-root --no-interaction --no-ansi
+
+COPY annatar /app/annatar
+
+ARG BUILD_VERSION=UNKNOWN
+ENV BUILD_VERSION=${BUILD_VERSION}
+
+VOLUME /app/data
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy static website files
+COPY ./static /app/static
+COPY ./templates /app/templates
+
+COPY run.py /app/run.py
+# Your application's default command, adjust as needed
+CMD ["poetry", "run", "python", "run.py"]
