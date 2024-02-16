@@ -1,5 +1,6 @@
 import asyncio
 from datetime import timedelta
+from hashlib import sha256
 from typing import AsyncGenerator, Optional
 
 import structlog
@@ -163,7 +164,8 @@ async def get_stream_for_torrent(
     """
     Get the stream link for a torrent and file.
     """
-    cache_key: str = f"torrent:{info_hash}:{file_id}"
+    key_hash: str = sha256(debrid_token.encode()).hexdigest()
+    cache_key: str = f"rd:torrent:{info_hash}:{key_hash}:{file_id}"
     cached_stream: Optional[StreamLink] = await db.get_model(cache_key, model=StreamLink)
     if cached_stream:
         log.info("Cached stream found", stream=cached_stream)
