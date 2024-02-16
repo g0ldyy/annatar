@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import aiohttp
 import structlog
@@ -68,7 +68,10 @@ async def add_magnet(magnet_link: str, debrid_token: str) -> str | None:
     return response_json["id"] if response_json else None
 
 
-async def get_instant_availability(info_hash: str, debrid_token: str) -> list[InstantFile]:
+async def get_instant_availability(
+    info_hash: str,
+    debrid_token: str,
+) -> AsyncGenerator[list[InstantFile], None]:
     res = await make_request(
         method="GET",
         url="/torrents/instantAvailability/{info_hash}",
@@ -76,17 +79,20 @@ async def get_instant_availability(info_hash: str, debrid_token: str) -> list[In
         debrid_token=debrid_token,
     )
     if not res:
-        return []
+        yield []
 
-    cached_files: list[InstantFile] = [
-        InstantFile(id=int(id_key), **file_info)
-        for value in res.values()
-        if value
-        for item in value.get("rd", [])
-        for id_key, file_info in item.items()
-    ]
-    log.info("found cached files", count=len(cached_files))
-    return cached_files
+    # XXX This doesn't work. .get is wrong
+    for hash, obj in res.items():
+        if hash.lower() != info_hash.lower():
+            continue
+        if "rd" not in obj:
+            continue
+        for set in obj.get("rd", []):
+            cached_files = [
+                InstantFile(id=int(file_id), **file_info) for file_id, file_info in set.items()
+            ]
+            log.info("found cached files", count=len(cached_files))
+            yield cached_files
 
 
 async def list_torrents(debrid_token: str) -> list[TorrentInfo]:
@@ -116,9 +122,9 @@ async def get_torrent_info(
     return TorrentInfo(**response_json)
 
 
-async def select_torrent_file(
+async def select_torrent_files(
     torrent_id: str,
-    file_id: str,
+    file_ids: list[int],
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> bool:
@@ -127,7 +133,7 @@ async def select_torrent_file(
         url="/torrents/selectFiles/{torrent_id}",
         url_values={"torrent_id": torrent_id},
         debrid_token=debrid_token,
-        body={"files": file_id},
+        body={"files": ",".join(str(f) for f in file_ids)},
     )
     return True
 

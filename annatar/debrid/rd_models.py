@@ -5,6 +5,11 @@ from pydantic import BaseModel
 from annatar.torrent import Torrent
 
 
+class InstantFileSet(BaseModel):
+    torrent: Torrent
+    file_ids: list[int]
+
+
 class InstantFile(BaseModel):
     id: int
     filename: str
