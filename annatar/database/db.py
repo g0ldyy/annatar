@@ -42,7 +42,7 @@ async def get_model(key: str, model: Type[T]) -> Optional[T]:
     try:
         return model.model_validate_json(res)
     except ValidationError as e:
-        log.error("failed to validate model", key=key, model=model.__name__, json=res, error=str(e))
+        log.error("failed to validate model", key=key, model=model.__name__, json=res, exc_info=e)
         return None
 
 
@@ -57,7 +57,7 @@ async def set(key: str, value: str, ttl: timedelta) -> bool:
             return True
         return False
     except Exception as e:
-        log.error("failed to set cache", key=key, error=str(e))
+        log.error("failed to set cache", key=key, exc_info=e)
         return False
 
 
@@ -71,7 +71,7 @@ async def get(key: str) -> Optional[str]:
         log.debug("cache hit", key=key)
         return res.decode("utf-8")  # type: ignore
     except Exception as e:
-        log.error("failed to get cache", key=key, error=str(e))
+        log.error("failed to get cache", key=key, exc_info=e)
         return None
 
 

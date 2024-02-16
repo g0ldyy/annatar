@@ -30,10 +30,10 @@ def parse_config(b64config: str) -> UserConfig:
     try:
         return UserConfig.model_validate_json(b64decode(b64config))
     except ValidationError as e:
-        log.warning("error decoding config", error=e, errro_type=type(e).__name__)
+        log.warning("error decoding config", exc_info=e, errro_type=type(e).__name__)
         raise RequestValidationError(
             errors=e.errors(include_url=False, include_input=False),
         )
     except Exception as e:
-        log.error("Unrecognized error", error=e)
+        log.error("Unrecognized error", exc_info=e)
         raise HTTPException(status_code=500, detail="Internal server error")

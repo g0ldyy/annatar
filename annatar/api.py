@@ -138,7 +138,7 @@ async def search(
         )
         return res
     except Exception as e:
-        log.error("error searching", type=type, id=imdb_id, error=str(e))
+        log.error("error searching", type=type, id=imdb_id, exc_info=e)
         res = StreamResponse(streams=[], error="Error searching")
         return res
     finally:

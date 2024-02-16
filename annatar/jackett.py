@@ -167,7 +167,6 @@ async def search_indexers(
 
     for task in tasks:
         if not task.done():
-            log.error("cancel task")
             task.cancel()
 
 
@@ -211,14 +210,15 @@ async def execute_search(
                                 status=response.status,
                                 reason=response.reason,
                                 body=await response.text(),
+                                exc_info=True,
                             )
                             return []
                         response_json = await response.json()
-                except TimeoutError as err:
-                    log.error("jacket search timeout", error=err, timeout=JACKETT_TIMEOUT)
+                except TimeoutError:
+                    log.error("jacket search timeout", timeout=JACKETT_TIMEOUT)
                     return []
                 except Exception as err:
-                    log.error("jacket search error", error=err)
+                    log.error("jacket search error", exc_info=err)
                     return []
 
         res: SearchResults = SearchResults(
@@ -336,11 +336,11 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
                     log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
                     return None
         await db.set(cache_key, location)
-    except TimeoutError as err:
-        log.error("magnet resolve: timeout", guid=guid, error=err)
+    except TimeoutError:
+        log.error("magnet resolve: timeout", guid=guid)
         return None
     except Exception as err:
-        log.error("magnet resolve error", error=err)
+        log.error("magnet resolve error", exc_info=err)
         return None
     finally:
         status = f"{response_status // 100}xx"

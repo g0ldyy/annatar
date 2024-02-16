@@ -29,6 +29,8 @@ structlog.configure(
         add_code_info,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.EventRenamer(to="msg"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
         structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
