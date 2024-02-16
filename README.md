@@ -2,7 +2,11 @@
 
 ![](https://i.imgur.com/UIVsFy7.png)
 
-The fastest just-in-time torrent/debrid search add-on for [Stremio](https://www.stremio.com/) providing results in under 3s.
+Annatar is free as in beer. If you are feeling generous I accept donations at [Ko-fi](https://ko-fi.com/annatar).
+
+---
+
+The **fastest** just-in-time torrent/debrid search add-on for [Stremio](https://www.stremio.com/) providing results in under 2-3s.
 
 Annatar searches torrent and debrid sites for cached content to provide instantly available content for Stremio. Results from Annatar typically arrive in **3s or less**. Annatar achieves its speed by using several fanout queries and map-reduce functions to gather the fastest and most accurate results using Jackett APIs. 
 
@@ -13,6 +17,10 @@ I created this plugin because I wanted a self-hosted alternative to Torrentio.
 There are other plugins that are similar to Annatar, but my experience with them has been not great. Results typically take over 10s which is far from ideal. Annatar is fast enough that the short delay does not bother me. Content is cached using [redislite](https://redislite.readthedocs.io/en/latest/). This includes debrid links, Torrent metadata, and Jackett search results. 
 
 Cache is built based on user-requests. Each new imdb id will be cold requested from Jackett, Cinemeta, and Debrid. Subsequent requests will retrieve cache (given some TTLs depending on arbitrary logic).
+
+## FREE Community Edition
+
+Although I wrote Annatar to be self-hosted it is also available as a [Community Edition](https://annatar.elfhosted.com/configure) thanks to sponsorship from https://elfhosted.com. If you want to customize Annatar but you can't self-host you can easily get your own instance with [just a few clicks](https://elfhosted.com/app/annatar/). 
 
 ## Running Locally
 
@@ -64,6 +72,25 @@ Install the add-on to Stremio:
 ## This is not Torrentio
 
 Torrentio provides instant results because it uses a crawler to cache content from indexers. All searches against the Torrentio add-on yield results from cached content. While this provides instant results it comes at a cost. Sometimes that [cost is downtime](https://www.reddit.com/r/StremioAddons/comments/1acl7ss/torrentio_faq/), but it also means that Torrentio caches much more than I need or care to know about. Also, because of this added complexity it is [non-trivial](https://github.com/Gabisonfire/knightcrawler) to self-host Torrentio. 
+
+
+
+## FAQ
+
+- **Q: Annatar is slow**
+  - A: It's possible you are using slow indexers. Open Jackett directly and search individual indexers and see which one returns slowly. Disable that indexer if it is slow or be patient and wait for the cache to build
+- **Q: Can you add support for** `<debrid provider>`
+  - A: Yes. Vote for an existing issue or create a new one to request it. I'll do what I can
+- **Q: What is Annatar**
+  - A: Annatar - Lord of Gifts was the guise that Sauron assumed during the Second Age of Middle Earth.
+- **Q: Can you add support for download-to-debrid links**
+  - A: No. Annatar is exclusively for instantly available content found on supported debrid services.
+- **Q: Can you add support for torrent streaming?**
+  - A: No. Annatar is exclusively for instantly available content found on supported debrid services.
+
+---
+
+## Contributing/Development
 
 This plugin is implemented in python using the [Stremio protocol definition](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md).
 
