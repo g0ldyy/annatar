@@ -127,6 +127,7 @@ async def search_indexers(
     search_query: SearchQuery,
     jackett_url: str,
     jackett_api_key: str,
+    max_results: int,
     imdb: int | None = None,
     timeout: int = 60,
     indexers: list[Indexer] = Indexer.all(),
@@ -154,6 +155,8 @@ async def search_indexers(
             if torrent and human.score_name(search_query, torrent.title) > 0:
                 info_hashes[torrent.info_hash] = True
                 yield torrent
+                if len(info_hashes) >= max_results:
+                    return
 
 
 async def execute_search(

@@ -77,6 +77,7 @@ async def _search(
         imdb=int(imdb_id.replace("tt", "")),
         timeout=60,
         indexers=[Indexer.find_by_id(i) for i in indexers],
+        max_results=max_results,
     )
 
     links: list[StreamLink] = []
