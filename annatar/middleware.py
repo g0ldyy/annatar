@@ -1,3 +1,4 @@
+import os
 import uuid
 from contextvars import ContextVar
 from datetime import datetime
@@ -14,6 +15,8 @@ from annatar import instrumentation
 log = structlog.get_logger(__name__)
 request_id = ContextVar("request_id", default="MISSING")
 
+CACHE_BUST_KEY = os.getenv("CACHE_BUST_KEY", uuid.uuid4().hex)
+
 REQUEST_DURATION = Histogram(
     name="request_duration_seconds",
     documentation="Duration of HTTP requests in seconds",
@@ -29,6 +32,16 @@ def get_route_handler(request: Request) -> str | None:
         if match.value == 2:
             return route.name
     return None
+
+
+class CacheBust(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+        if request.headers.get("x-cache-bust") == CACHE_BUST_KEY:
+            instrumentation.NO_CACHE.set(True)
+        else:
+            instrumentation.NO_CACHE.set(False)
+        resp: Response = await call_next(request)
+        return resp
 
 
 class Metrics(BaseHTTPMiddleware):

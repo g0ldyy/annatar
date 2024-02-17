@@ -16,6 +16,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(middleware.Metrics)
 app.add_middleware(middleware.RequestLogger)
 app.add_middleware(middleware.RequestID)
+app.add_middleware(middleware.CacheBust)
 
 app.add_route("/metrics", instrumentation.metrics_handler)
 

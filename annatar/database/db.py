@@ -35,8 +35,8 @@ async def ping() -> bool:
     return True
 
 
-async def get_model(key: str, model: Type[T]) -> Optional[T]:
-    res: Optional[str] = await get(key)
+async def get_model(key: str, model: Type[T], force: bool = False) -> Optional[T]:
+    res: Optional[str] = await get(key, force=force)
     if res is None:
         return None
     try:
@@ -62,8 +62,11 @@ async def set(key: str, value: str, ttl: timedelta) -> bool:
 
 
 @REQUEST_DURATION.labels("GET").time()
-async def get(key: str) -> Optional[str]:
+async def get(key: str, force: bool = False) -> Optional[str]:
     try:
+        if bypass := instrumentation.NO_CACHE.get(False):
+            log.debug("cache bypassed", key=key, bypass=bypass)
+            return None
         res: Optional[bytes] = redis.get(key)  # type: ignore
         if not res:
             log.debug("cache miss", key=key)
