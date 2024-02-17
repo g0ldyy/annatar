@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 
 import uvicorn
+from prometheus_client import CollectorRegistry, multiprocess
 
 NUM_CORES: int = os.cpu_count() or 1
 BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
@@ -35,9 +36,9 @@ if __name__ == "__main__":
         os.environ["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(resource_attrs)
 
     os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
-
-    if not os.path.exists(PROM_DIR):
+    if not os.path.isdir(PROM_DIR):
         os.mkdir(PROM_DIR)
+    multiprocess.MultiProcessCollector(CollectorRegistry())
 
     uvicorn.run(
         "annatar.main:app",

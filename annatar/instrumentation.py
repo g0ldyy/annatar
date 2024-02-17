@@ -1,6 +1,7 @@
 import os
 from contextvars import ContextVar
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from prometheus_client import (
@@ -12,28 +13,35 @@ from prometheus_client import (
     multiprocess,
 )
 
-REGISTRY = CollectorRegistry()
-multiprocess.MultiProcessCollector(REGISTRY)
+log = structlog.get_logger()
+
 NO_CACHE = ContextVar("NO_CACHE", default=False)
+
+
+def registry() -> CollectorRegistry:
+    reg = CollectorRegistry()
+    multiprocess.MultiProcessCollector(reg)
+    return reg
+
 
 Gauge(
     name="build_info",
     documentation="build information",
     multiprocess_mode="livemin",
-    registry=REGISTRY,
     labelnames=["version"],
+    registry=registry(),
 ).labels(version=os.getenv("BUILD_VERSION", "UNKNOWN")).set(1)
 
 HTTP_CLIENT_REQUEST_DURATION = Histogram(
     name="http_client_request_duration_seconds",
     documentation="Duration of Redis requests in seconds",
     labelnames=["client", "method", "url", "status_code", "error"],
-    registry=REGISTRY,
+    registry=registry(),
 )
 
 
 async def metrics_handler(request: Request):
-    data = generate_latest(REGISTRY)
+    data = generate_latest(registry())
     return Response(
         content=data,
         headers={
@@ -44,8 +52,10 @@ async def metrics_handler(request: Request):
 
 
 def init():
-    pass
+    return
 
 
-def instrument_fastapi(app: FastAPI):
-    pass
+def shutdown(app: FastAPI):
+    log.info("shutdown prometheus multiprocess_mode")
+    multiprocess.mark_process_dead(os.getpid())  # type: ignore
+    return

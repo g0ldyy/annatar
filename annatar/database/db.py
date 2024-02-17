@@ -25,7 +25,7 @@ REQUEST_DURATION = Histogram(
     name="redis_command_duration_seconds",
     documentation="Duration of Redis requests in seconds",
     labelnames=["command"],
-    registry=instrumentation.REGISTRY,
+    registry=instrumentation.registry(),
 )
 
 
@@ -48,6 +48,26 @@ async def get_model(key: str, model: Type[T], force: bool = False) -> Optional[T
 
 async def set_model(key: str, model: BaseModel, ttl: timedelta) -> bool:
     return await set(key, model.model_dump_json(), ttl=ttl)
+
+
+@REQUEST_DURATION.labels("PFCOUNT").time()
+async def unique_count(key: str) -> int:
+    try:
+        return redis.pfcount(key)
+    except Exception as e:
+        log.error("failed to pfadd", key=key, exc_info=e)
+        return False
+
+
+@REQUEST_DURATION.labels("PFADD").time()
+async def unique_add(key: str, value: str) -> bool:
+    try:
+        res = redis.pfadd(key, value)
+        log.debug("redis command", command="PFADD", key=key, value=value, res=res)
+        return bool(res)
+    except Exception as e:
+        log.error("failed to pfadd", key=key, exc_info=e)
+        return False
 
 
 @REQUEST_DURATION.labels("SET").time()

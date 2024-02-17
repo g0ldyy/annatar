@@ -33,7 +33,7 @@ REQUEST_DURATION = Histogram(
     name="jackett_request_duration_seconds",
     documentation="Duration of Jackett requests in seconds",
     labelnames=["method", "indexer", "status", "cached"],
-    registry=instrumentation.REGISTRY,
+    registry=instrumentation.registry(),
 )
 
 

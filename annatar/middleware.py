@@ -21,7 +21,7 @@ REQUEST_DURATION = Histogram(
     name="request_duration_seconds",
     documentation="Duration of HTTP requests in seconds",
     labelnames=["method", "request_handler", "status"],
-    registry=instrumentation.REGISTRY,
+    registry=instrumentation.registry(),
 )
 
 

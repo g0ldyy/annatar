@@ -4,7 +4,7 @@ from hashlib import md5
 from typing import Optional
 
 import structlog
-from prometheus_client import Histogram
+from prometheus_client import Counter, Histogram
 
 from annatar import human, instrumentation, jackett
 from annatar.database import db
@@ -15,6 +15,12 @@ from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
 
 log = structlog.get_logger(__name__)
+
+UNIQUE_SEARCHES: Counter = Counter(
+    name="unique_searches",
+    documentation="Unique stream search counter",
+    registry=instrumentation.registry(),
+)
 
 
 async def _search(
@@ -27,6 +33,10 @@ async def _search(
     season_episode: list[int] = [],
     indexers: list[str] = [],
 ) -> StreamResponse:
+    if await db.unique_add("stream_request", f"{imdb_id}:{season_episode}"):
+        log.debug("unique search")
+        UNIQUE_SEARCHES.inc()
+
     idx: str = "-".join(sorted(indexers))
     cache_key: str = f"api:search:{type}:{imdb_id}:{season_episode}:{debrid.id()}:{idx}"
 
@@ -109,7 +119,7 @@ REQUEST_DURATION = Histogram(
     name="api_request_duration_seconds",
     documentation="Duration of API requests in seconds",
     labelnames=["type", "debrid_service", "cached", "error"],
-    registry=instrumentation.REGISTRY,
+    registry=instrumentation.registry(),
 )
 
 

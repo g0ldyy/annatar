@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ueo pipefail
 
+CACHE_BUST_KEY=${CACHE_BUST_KEY:-}
 SERVER_URL=${SERVER_URL:-http://127.0.0.1:8000}
 kind=${1:-}
 term=${2:-}
@@ -36,6 +37,7 @@ echo "${term}" \
 	| tr ',' '\n' \
 	| xargs -I{} -P17 \
 		timeout 30 curl \
+			-H "x-cache-bust: ${CACHE_BUST_KEY}" \
 			-SLs \
 			-D /dev/stderr \
 			-X GET \
