@@ -101,7 +101,7 @@ async def _search(
         for link in sorted_links
     ]
     resp = StreamResponse(streams=streams)
-    await db.set_model(cache_key, resp, ttl=timedelta(days=7))
+    await db.set_model(cache_key, resp, ttl=timedelta(hours=1))
     return resp
 
 

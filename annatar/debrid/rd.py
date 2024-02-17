@@ -183,7 +183,7 @@ async def get_stream_for_torrent(
         name=unrestricted_link.filename,
         url=unrestricted_link.download,
     )
-    await db.set_model(cache_key, sl, ttl=timedelta(weeks=4))
+    await db.set_model(cache_key, sl, ttl=timedelta(hours=4))
     return sl
 
 
@@ -233,7 +233,7 @@ async def get_stream_link(
         await db.set_model(
             key=f"rd:instant_file_set:torrent:{torrent.info_hash.upper()}",
             model=InstantFileSet(torrent=torrent, file_ids=[f.id for f in cached_files]),
-            ttl=timedelta(weeks=8),
+            ttl=timedelta(hours=8),
         )
         return StreamLink(
             size=file.filesize,
