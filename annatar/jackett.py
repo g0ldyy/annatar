@@ -165,10 +165,6 @@ async def search_indexers(
                 info_hashes[torrent.info_hash] = True
                 yield torrent
 
-    for task in tasks:
-        if not task.done():
-            task.cancel()
-
 
 async def execute_search(
     jackett_url: str,
