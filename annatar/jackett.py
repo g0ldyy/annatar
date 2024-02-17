@@ -112,23 +112,13 @@ async def search_indexer(
         )
     )
 
-    # cache for 7 days if we found something, otherwise cache for 1 day
-    # since it's unlikely we will find anything new within 24h
-    ttl_days = 7 if len(prioritized_list) > 0 else 1
-
-    # if the release is older than 1 year, cache for longer since the liklihood
-    # we will find a better release is lower as time goes on
-    year_diff = datetime.now().year - search_query.year
-    if search_query.year and year_diff > 1:
-        multiplier = 3 * year_diff
-        # don't care any more than 60 days though
-        ttl_days = min(60, ttl_days * multiplier)
-        log.info(
-            "this is an old release, caching for longer",
-            days=ttl_days,
-            release_year=search_query.year,
-        )
-    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=timedelta(days=ttl_days))
+    # cache for longer if we found enough data
+    ttl: timedelta = (
+        timedelta(minutes=5)
+        if len(prioritized_list) < MAX_RESULTS_PER_INDEXER
+        else timedelta(minutes=15)
+    )
+    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=ttl)
 
     return prioritized_list
 
@@ -176,13 +166,6 @@ async def execute_search(
     response_status: int = 200
     cached_response: bool = False
     try:
-        kvs: str = ":".join([f"{k}:{v}" for k, v in params.items()])
-        cache_key: str = f"jackett:indexer:{indexer}:search:{kvs}"
-        cached_results: SearchResults | None = await db.get_model(cache_key, SearchResults)
-        if cached_results:
-            cached_response = True
-            return cached_results.Results
-
         url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
         with bound_contextvars(
             search_params=params,
@@ -220,8 +203,6 @@ async def execute_search(
         res: SearchResults = SearchResults(
             Results=[SearchResult(**result) for result in response_json["Results"]]
         )
-        if res.Results:
-            await db.set_model(cache_key, res, timedelta(days=1))
         return res.Results
     finally:
         status = f"{response_status // 100}xx"
