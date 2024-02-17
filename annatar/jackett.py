@@ -168,7 +168,7 @@ async def execute_search(
     try:
         url: str = f"{jackett_url}/api/v2.0/indexers/all/results"
         with bound_contextvars(
-            search_params=params,
+            search_params=params.copy(),
             url=url,
             indexer=indexer,
         ):
