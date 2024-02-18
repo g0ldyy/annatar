@@ -40,6 +40,9 @@ amd64_build:
 
 arm64_build:
   stage: docker_build
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /arm64$/'
+    - if: '$CI_COMMIT_BRANCH == "master"'
   image: docker:latest
   variables:
     BUILD_ARCH: linux/arm64
@@ -52,12 +55,15 @@ arm64_build:
     - apk add --no-cache qemu qemu-img git make
     - make container
 
-docker_push:
+docker_manifest:
   stage: docker_push
   image: docker:latest
   variables:
     BUILD_ARCH: linux/arm64
     DOCKERFILE: Dockerfile.arm64
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /arm64$/'
+    - if: '$CI_COMMIT_BRANCH == "master"'
   before_script:
     - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
     - echo "Image tag set to $IMAGE_TAG"

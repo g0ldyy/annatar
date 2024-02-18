@@ -17,7 +17,6 @@ from annatar.debrid.rd_models import (
     UnrestrictedLink,
 )
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
@@ -34,7 +33,7 @@ async def find_streamable_file_id(
         return None
     sorted_files: list[TorrentFile] = sorted(files, key=lambda f: f.bytes, reverse=True)
     if not season_episode:
-        log.info("No season_episode, returning biggest file", file=sorted_files[0])
+        log.debug("returning biggest file", file=sorted_files[0])
         return sorted_files[0].id if human.is_video(sorted_files[0].path) else None
 
     for file in sorted_files:
@@ -105,10 +104,8 @@ async def _get_stream_for_torrent(
         log.error("cached torrent not found", info_hash=info_hash)
         return None
 
-    torrent: Torrent = file_set.torrent
-
     torrent_id: Optional[str] = await api.add_magnet(
-        info_hash=torrent.info_hash,
+        info_hash=file_set.info_hash,
         debrid_token=debrid_token,
     )
 
@@ -132,7 +129,7 @@ async def _get_stream_for_torrent(
     torrent_link: str | None = await get_torrent_link(
         torrent_id=torrent_id,
         file_id=file_id,
-        info_hash=torrent.info_hash,
+        info_hash=file_set.info_hash,
         debrid_token=debrid_token,
     )
     if not torrent_link:
@@ -142,7 +139,7 @@ async def _get_stream_for_torrent(
     log.info("RD Cached links found", link=torrent_link)
 
     unrestricted_link: Optional[UnrestrictedLink] = await api.unrestrict_link(
-        torrent=torrent,
+        info_hash=info_hash,
         link=torrent_link,
         debrid_token=debrid_token,
     )
@@ -190,12 +187,12 @@ async def get_stream_for_torrent(
 
 @timestamped()
 async def get_stream_link(
-    torrent: Torrent,
+    info_hash: str,
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
     async for cached_files in api.get_instant_availability(
-        torrent.info_hash,
+        info_hash,
         debrid_token,
     ):
         if not cached_files:
@@ -222,18 +219,18 @@ async def get_stream_link(
         if not file:
             log.error(
                 "cached file set does not contain the desired file_id. This should not be possible",
-                torrent=torrent.info_hash,
+                torrent=info_hash,
                 file_id=file_id,
             )
             return
 
         log.debug("found matching instantAvailable set")
         # this route has to match the route provided to provide the 302
-        url: str = f"/rd/{debrid_token}/{torrent.info_hash}/{file_id}"
+        url: str = f"/rd/{debrid_token}/{info_hash}/{file_id}"
 
         await db.set_model(
-            key=f"rd:instant_file_set:torrent:{torrent.info_hash.upper()}",
-            model=InstantFileSet(torrent=torrent, file_ids=[f.id for f in cached_files]),
+            key=f"rd:instant_file_set:torrent:{info_hash.upper()}",
+            model=InstantFileSet(info_hash=info_hash, file_ids=[f.id for f in cached_files]),
             ttl=timedelta(hours=8),
         )
         return StreamLink(
@@ -245,7 +242,7 @@ async def get_stream_link(
 
 @timestamped()
 async def get_stream_links(
-    torrents: AsyncGenerator[Torrent, None],
+    torrents: AsyncGenerator[str, None],
     debrid_token: str,
     season_episode: list[int] = [],
     max_results: int = 5,
@@ -259,12 +256,12 @@ async def get_stream_links(
     tasks = [
         asyncio.create_task(
             get_stream_link(
-                torrent=torrent,
+                info_hash=info_hash,
                 season_episode=season_episode,
                 debrid_token=debrid_token,
             )
         )
-        async for torrent in torrents
+        async for info_hash in torrents
     ]
 
     for task in asyncio.as_completed(tasks, timeout=timeout):

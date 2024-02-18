@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Annotated, Any, Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Path, Request
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
@@ -60,6 +60,16 @@ async def get_manifest(request: Request) -> dict[str, Any]:
             "configurable": True,
             "configurationRequired": False,
         },
+    }
+
+
+@router.get("/api/v2/hashes/{imdb_id:str}", description="Get hashes for a given IMDB ID")
+async def get_hashes(
+    imdb_id: Annotated[str, Path(description="IMDB ID", examples=["tt0120737"])],
+    limit: Annotated[int, Query(description="Limit results", defualt=10)],
+) -> dict[str, Any]:
+    return {
+        "hashes": await api.get_hashes(imdb_id=imdb_id, limit=limit),
     }
 
 

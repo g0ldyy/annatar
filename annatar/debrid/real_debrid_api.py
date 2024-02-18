@@ -7,7 +7,6 @@ import structlog
 from annatar import instrumentation
 from annatar.debrid import magnet
 from annatar.debrid.rd_models import InstantFile, TorrentInfo, UnrestrictedLink
-from annatar.torrent import Torrent
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
@@ -137,7 +136,7 @@ async def select_torrent_files(
 
 
 async def unrestrict_link(
-    torrent: Torrent,
+    info_hash: str,
     link: str,
     debrid_token: str,
 ) -> UnrestrictedLink | None:
@@ -149,9 +148,9 @@ async def unrestrict_link(
     )
     if not response_json:
         return None
-    response_json["torrent"] = torrent
+    response_json["info_hash"] = info_hash
     unrestrict_info: UnrestrictedLink = UnrestrictedLink(**response_json)
-    log.info("Got unrestrict link", link=unrestrict_info.link, info_hash=torrent.info_hash)
+    log.info("Got unrestrict link", link=unrestrict_info.link, info_hash=info_hash)
     return unrestrict_info
 
 

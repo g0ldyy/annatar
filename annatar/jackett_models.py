@@ -3,11 +3,14 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from annatar.torrent import Torrent
+
+class ScoredTorrent(BaseModel):
+    info_hash: str
+    score: int = 0
 
 
 class Torrents(BaseModel):
-    items: list[Torrent]
+    items: list[str]
 
 
 class ListIndexersResponse(BaseModel):
