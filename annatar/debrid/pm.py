@@ -4,7 +4,6 @@ from typing import AsyncGenerator, Optional
 import structlog
 
 from annatar import human
-from annatar.debrid import magnet
 from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
@@ -41,23 +40,17 @@ async def select_stream_file(
 
 @timestamped()
 async def get_stream_link(
-    magnet_link: str,
+    info_hash: str,
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
-    info_hash: str | None = magnet.get_info_hash(magnet_link)
-    if not info_hash:
-        log.error("magnet is not a valid magnet link", magnet_link=magnet_link)
-        return None
-
     dl: Optional[DirectDLResponse] = await api.directdl(
-        magnet_link=magnet_link,
-        api_token=debrid_token,
         info_hash=info_hash,
+        api_token=debrid_token,
     )
 
     if not dl or not dl.content:
-        log.info("magnet has no cached content", info_hash=info_hash)
+        log.info("torrent has no cached content", info_hash=info_hash)
         return None
 
     return await select_stream_file(dl.content, season_episode)
@@ -78,7 +71,7 @@ async def get_stream_links(
     tasks = [
         asyncio.create_task(
             get_stream_link(
-                magnet_link=torrent.url,
+                info_hash=torrent.info_hash,
                 season_episode=season_episode,
                 debrid_token=debrid_token,
             )

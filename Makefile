@@ -31,6 +31,7 @@ docker-manifest:
 	docker manifest push $(DOCKER_TAG)
 
 test:
+	poetry run pyright annatar
 	poetry run isort --check --diff annatar run.py
 	poetry run black --check --diff annatar run.py
 	poetry run pytest

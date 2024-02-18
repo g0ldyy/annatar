@@ -6,6 +6,7 @@ import structlog
 from pydantic import BaseModel
 
 from annatar.database import db
+from annatar.debrid import magnet
 from annatar.debrid.pm_models import DirectDLResponse
 from annatar.logging import timestamped
 
@@ -51,9 +52,7 @@ async def make_request(
             return HTTPResponse(model=model_instance, response=response)
 
 
-@timestamped(["magnet_link", "info_hash"])
 async def directdl(
-    magnet_link: str,
     api_token: str,
     info_hash: str,
 ) -> Optional[DirectDLResponse]:
@@ -67,7 +66,7 @@ async def directdl(
         method="POST",
         model=DirectDLResponse,
         url="/transfer/directdl",
-        data={"src": magnet_link},
+        data={"src": magnet.make_magnet_link(info_hash)},
     )
     if dl_res.response.status not in range(200, 299):
         log.error(

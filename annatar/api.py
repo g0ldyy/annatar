@@ -70,25 +70,26 @@ async def _search(
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
 
+    found_indexers: list[Indexer | None] = [Indexer.find_by_id(i) for i in indexers]
     async_torrents = jackett.search_indexers(
         jackett_url=jackett_url,
         jackett_api_key=jackett_api_key,
         search_query=q,
         imdb=int(imdb_id.replace("tt", "")),
         timeout=60,
-        indexers=[Indexer.find_by_id(i) for i in indexers],
+        indexers=[i for i in found_indexers if i],
         max_results=max_results,
     )
 
     links: list[StreamLink] = []
 
-    async for link in debrid.get_stream_links(
+    async for link in debrid.get_stream_links(  # type: ignore
         torrents=async_torrents,
         season_episode=season_episode,
         max_results=max_results,
     ):
-        if human.score_by_quality(link.name) > 0:
-            links.append(link)
+        if human.score_by_quality(link.name) > 0:  # type: ignore
+            links.append(link)  # type: ignore
 
     sorted_links: list[StreamLink] = list(
         sorted(

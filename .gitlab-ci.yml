@@ -5,6 +5,15 @@ stages:
 
 variables:
   DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375 
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_PUSH: --push
+
+services:
+  - name: docker:dind
+    alias: docker
+    entrypoint: ["dockerd-entrypoint.sh", "--tls=false"]
 
 test:
   stage: test
@@ -18,12 +27,9 @@ test:
 amd64_build:
   stage: docker_build
   image: docker:latest
-  services:
-    - docker:dind
   variables:
     BUILD_ARCH: linux/amd64
     DOCKERFILE: Dockerfile.amd64
-    DOCKER_PUSH: --push
   before_script:
     - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
     - echo "Image tag set to $IMAGE_TAG"
@@ -35,12 +41,9 @@ amd64_build:
 arm64_build:
   stage: docker_build
   image: docker:latest
-  services:
-    - docker:dind
   variables:
     BUILD_ARCH: linux/arm64
     DOCKERFILE: Dockerfile.arm64
-    DOCKER_PUSH: --push
   before_script:
     - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
     - echo "Image tag set to $IMAGE_TAG"
@@ -52,12 +55,9 @@ arm64_build:
 docker_push:
   stage: docker_push
   image: docker:latest
-  services:
-    - docker:dind
   variables:
     BUILD_ARCH: linux/arm64
     DOCKERFILE: Dockerfile.arm64
-    DOCKER_PUSH: --push
   before_script:
     - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
     - echo "Image tag set to $IMAGE_TAG"
