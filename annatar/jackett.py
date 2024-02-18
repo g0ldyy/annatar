@@ -16,15 +16,16 @@ from annatar.jackett_models import (
     MOVIES,
     SERIES,
     Indexer,
-    ScoredTorrent,
     SearchQuery,
     SearchResult,
     SearchResults,
+    Torrents,
 )
+from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
-MAX_RESULTS_PER_INDEXER = int(os.environ.get("JACKETT_MAX_RESULTS", 50))
+MAX_RESULTS_PER_INDEXER = int(os.environ.get("JACKETT_MAX_RESULTS", 75))
 JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 5))
 
 
@@ -45,14 +46,22 @@ async def search_indexer(
     jackett_url: str,
     jackett_api_key: str,
     indexer: str,
-    cache_key: str,
     imdb: int | None = None,
-) -> list[str]:
+) -> list[Torrent]:
     suffix: str = "" if search_query.type == "series" else f"{search_query.year}"
+    cache_key: str = ":".join(
+        [
+            f"jackett:indexer:{indexer}:search:{search_query.type}:{search_query.name}",
+            suffix,
+        ]
+    )
+    cached_torrents: Torrents | None = await db.get_model(cache_key, Torrents)
+    if cached_torrents:
+        return cached_torrents.items
+
     sanitized_name: str = re.sub(r"\W", " ", search_query.name)
     category: str = str(MOVIES.id if search_query.type == "movie" else SERIES.id)
 
-    torrents: list[str] = []
     try:
         raw_results: list[SearchResult] = await execute_search(
             jackett_api_key=jackett_api_key,
@@ -68,7 +77,8 @@ async def search_indexer(
         # if the search fails, we will cache the empty result for a short time
         # to avoid hammering the indexer
         # Don't log because we already logged in execute_search
-        return torrents
+        await db.set_model(cache_key, Torrents(items=[]), ttl=timedelta(minutes=5))
+        return []
 
     search_results: list[SearchResult] = sorted(
         raw_results,
@@ -76,35 +86,40 @@ async def search_indexer(
         reverse=True,
     )
 
+    torrents: dict[str, Torrent] = {}
     tasks = [
         asyncio.create_task(map_matched_result(result=result, search_query=search_query, imdb=imdb))
         for result in search_results
     ]
 
-    scored_torrents: list[ScoredTorrent] = []
-    for i, task in enumerate(asyncio.as_completed(tasks)):
-        torrent: ScoredTorrent | None = await task
-        if torrent and torrent.score > 0:
-            if await db.unique_list_add(
-                name=cache_key,
-                item=torrent.info_hash,
-                score=torrent.score,
-            ):
-                log.info("added scored torrent to unique list", torrent=torrent)
-                scored_torrents.append(torrent)
-                if i > MAX_RESULTS_PER_INDEXER:
-                    # back off once we have what we need
-                    # doing this here so that the loop will continue for tasks
-                    # that have already completed
-                    for t in tasks:
-                        if not t.done():
-                            t.cancel()
+    for task in asyncio.as_completed(tasks):
+        torrent: Torrent | None = await task
+        if torrent:
+            torrents[torrent.info_hash] = torrent
+            log.info(
+                "found a torrent",
+                tracker=indexer,
+                info_hash=torrent.info_hash,
+                title=torrent.title,
+                seeders=torrent.seeders,
+            )
 
-    prioritized_list: list[str] = [
-        t.info_hash for t in sorted(list(scored_torrents), key=lambda t: t.score, reverse=True)
-    ]
+    prioritized_list: list[Torrent] = list(
+        sorted(
+            list(torrents.values()),
+            key=lambda t: t.match_score,
+            reverse=True,
+        )
+    )
 
-    log.info("found torrents in indexer", tracker=indexer, count=len(prioritized_list))
+    # cache for longer if we found enough data
+    ttl: timedelta = (
+        timedelta(minutes=15)
+        if len(prioritized_list) < MAX_RESULTS_PER_INDEXER
+        else timedelta(minutes=60)
+    )
+    await db.set_model(cache_key, Torrents(items=prioritized_list), ttl=ttl)
+
     return prioritized_list
 
 
@@ -116,20 +131,9 @@ async def search_indexers(
     imdb: int | None = None,
     timeout: int = 60,
     indexers: list[Indexer] = Indexer.all(),
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[Torrent, None]:
     log.info("searching indexers", indexers=indexers)
-    cache_key: str = f"jackett:search:tt{imdb}"
-    torrents: list[str] = await db.unique_list_get(cache_key)
-
-    if len(torrents) >= MAX_RESULTS_PER_INDEXER:
-        log.info("found enough torrents in cache", count=len(torrents))
-        for i, info_hash in enumerate(torrents):
-            yield info_hash
-            if i >= max_results:
-                return
-        return
-
-    # the list is not long enough, we need to search for more
+    info_hashes: dict[str, bool] = {}
     tasks = [
         asyncio.create_task(
             search_indexer(
@@ -138,48 +142,24 @@ async def search_indexers(
                 jackett_api_key=jackett_api_key,
                 imdb=imdb,
                 indexer=indexer.id,
-                cache_key=cache_key,
             )
         )
         for indexer in indexers
         if indexer.supports(search_query.type)
     ]
-
-    await gather_indexer_results(tasks)
-
-    # now get the prioritized list from the cache because we can't reprioritize
-    # now that we lost the scores. Redis will keep the order for us
-    prioritized_list: list[str] = await db.unique_list_get(cache_key)
-
-    # cache for longer if we found enough data
-    ttl: timedelta = (
-        timedelta(minutes=15)
-        if len(prioritized_list) < MAX_RESULTS_PER_INDEXER
-        else timedelta(hours=6)
-    )
-
-    await db.set_ttl(cache_key, ttl)
-    for i, info_hash in enumerate(prioritized_list):
-        yield info_hash
-        if i >= max_results:
-            return
-
-    log.info("finished searching indexers", count=len(prioritized_list))
-
-
-async def gather_indexer_results(tasks: list[asyncio.Task[list[str]]]):
-    info_hashes: dict[str, bool] = {}
     for task in asyncio.as_completed(tasks):
-        indexer_results: list[str] = await task
-        for info_hash in indexer_results[:MAX_RESULTS_PER_INDEXER]:
-            if not info_hash:
+        indexer_results: list[Torrent] = await task
+        for torrent in indexer_results[:MAX_RESULTS_PER_INDEXER]:
+            if not torrent:
                 continue
-            if info_hash in info_hashes:
+            if torrent.info_hash in info_hashes:
                 continue
-            info_hashes[info_hash] = True
-            if len(info_hashes) >= MAX_RESULTS_PER_INDEXER:
-                log.info("found enough torrents", count=len(info_hashes))
-                return
+            torrent.match_score = human.score_name(search_query, torrent.title)
+            if torrent.match_score > 0:
+                info_hashes[torrent.info_hash] = True
+                yield torrent
+                if len(info_hashes) >= max_results:
+                    return
 
 
 class JackettSearchError(Exception):
@@ -262,7 +242,7 @@ async def map_matched_result(
     result: SearchResult,
     search_query: SearchQuery,
     imdb: int | None,
-) -> ScoredTorrent | None:
+) -> Torrent | None:
     if imdb and result.Imdb and result.Imdb != imdb:
         log.info(
             "skipping mismatched IMDB",
@@ -304,9 +284,19 @@ async def map_matched_result(
         )
     )
 
-    if info_hash:
-        return ScoredTorrent(info_hash=info_hash, score=match_score)
-    return None
+    if not info_hash:
+        return None
+
+    return Torrent(
+        info_hash=info_hash,
+        guid=result.Guid,
+        title=result.Title,
+        size=result.Size,
+        seeders=result.Seeders,
+        tracker=result.Tracker,
+        imdb=result.Imdb,
+        match_score=match_score,
+    )
 
 
 async def resolve_magnet_link(guid: str, link: str) -> str | None:

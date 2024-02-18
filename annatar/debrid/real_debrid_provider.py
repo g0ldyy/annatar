@@ -21,7 +21,7 @@ class RealDebridProvider(DebridService):
     def shared_cache(self):
         return True
 
-    async def get_stream_links(  # type: ignore
+    async def get_stream_links(
         self,
         torrents: AsyncGenerator[str, None],
         season_episode: list[int],
