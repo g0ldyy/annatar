@@ -8,7 +8,6 @@ from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
 from annatar.logging import timestamped
-from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
@@ -44,6 +43,7 @@ async def get_stream_link(
     debrid_token: str,
     season_episode: list[int] = [],
 ) -> StreamLink | None:
+    log.info("searching for stream link", info_hash=info_hash, season_episode=season_episode)
     dl: Optional[DirectDLResponse] = await api.directdl(
         info_hash=info_hash,
         api_token=debrid_token,
@@ -58,7 +58,7 @@ async def get_stream_link(
 
 @timestamped()
 async def get_stream_links(
-    torrents: AsyncGenerator[Torrent, None],
+    torrents: AsyncGenerator[str, None],
     debrid_token: str,
     season_episode: list[int],
     max_results: int = 5,
@@ -71,23 +71,21 @@ async def get_stream_links(
     tasks = [
         asyncio.create_task(
             get_stream_link(
-                info_hash=torrent.info_hash,
+                info_hash=info_hash,
                 season_episode=season_episode,
                 debrid_token=debrid_token,
             )
         )
-        async for torrent in torrents
+        async for info_hash in torrents
     ]
 
     for task in asyncio.as_completed(tasks):
         link: Optional[StreamLink] = await task
         if link and link.url not in links:
+            log.info("got link from debrid", link=link.url)
             links[link.url] = link
             yield link
             if len(links) >= max_results:
                 break
 
-    # Cancel remaining tasks
-    for task in tasks:
-        if not task.done():
-            task.cancel()
+    log.debug("finished getting stream links", links=len(links), torrents=len(tasks))

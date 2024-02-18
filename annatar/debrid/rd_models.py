@@ -2,11 +2,9 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from annatar.torrent import Torrent
-
 
 class InstantFileSet(BaseModel):
-    torrent: Torrent
+    info_hash: str
     file_ids: list[int]
 
 
@@ -51,7 +49,7 @@ class TorrentInfo(BaseModel):
 
 class UnrestrictedLink(BaseModel):
     id: str
-    torrent: Torrent
+    info_hash: str
     filename: str
     mimeType: str  # Mime Type of the file, guessed by the file extension
     filesize: int  # Filesize in bytes, 0 if unknown

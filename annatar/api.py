@@ -125,6 +125,15 @@ REQUEST_DURATION = Histogram(
 )
 
 
+async def get_hashes(
+    imdb_id: str,
+    limit: int = 20,
+):
+    cache_key: str = f"jackett:search:{imdb_id}"
+    res = await db.unique_list_get(cache_key)
+    return res[:limit]
+
+
 async def search(
     type: str,
     max_results: int,

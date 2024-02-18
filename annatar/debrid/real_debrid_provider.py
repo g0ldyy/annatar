@@ -3,7 +3,6 @@ from typing import AsyncGenerator, Optional
 from annatar.debrid import rd
 from annatar.debrid.debrid_service import DebridService
 from annatar.debrid.models import StreamLink
-from annatar.torrent import Torrent
 
 
 class RealDebridProvider(DebridService):
@@ -24,7 +23,7 @@ class RealDebridProvider(DebridService):
 
     async def get_stream_links(  # type: ignore
         self,
-        torrents: AsyncGenerator[Torrent, None],
+        torrents: AsyncGenerator[str, None],
         season_episode: list[int],
         max_results: int = 5,
     ) -> AsyncGenerator[StreamLink, None]:

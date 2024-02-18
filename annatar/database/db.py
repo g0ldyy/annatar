@@ -46,8 +46,50 @@ async def get_model(key: str, model: Type[T], force: bool = False) -> Optional[T
         return None
 
 
+@REQUEST_DURATION.labels("ZADD").time()
+async def unique_list_add(
+    name: str,
+    item: str,
+    score: int = 0,
+    ttl: timedelta = timedelta(0),
+) -> bool:
+    added: int = redis.zadd(name, {item: score})
+    if ttl.total_seconds() > 0:
+        log.debug("setting ttl for unique list", name=name, ttl=ttl)
+        redis.expire(name, time=ttl)
+    return bool(added)
+
+
+@REQUEST_DURATION.labels("ZRANGE").time()
+async def unique_list_get(name: str) -> list[str]:
+    try:
+        return [
+            i.decode("utf-8")  # type: ignore
+            for i in redis.zrevrange(  # type: ignore
+                name=name,
+                start=0,
+                end=-1,
+                withscores=False,
+            )
+        ]
+    except Exception as e:
+        log.error("failed to get unique list", name=name, exc_info=e)
+        return []
+
+
 async def set_model(key: str, model: BaseModel, ttl: timedelta) -> bool:
-    return await set(key, model.model_dump_json(), ttl=ttl)
+    return await set(key, model.model_dump_json(exclude_none=True), ttl=ttl)
+
+
+@REQUEST_DURATION.labels("EXPIRE").time()
+async def set_ttl(key: str, ttl: timedelta) -> bool:
+    try:
+        if redis.expire(key, time=ttl):
+            return True
+        return False
+    except Exception as e:
+        log.error("failed to set cache ttl", key=key, exc_info=e)
+        return False
 
 
 @REQUEST_DURATION.labels("PFCOUNT").time()

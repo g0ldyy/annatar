@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
 from annatar.debrid.models import StreamLink
-from annatar.torrent import Torrent
 
 
 class DebridService(ABC):
@@ -33,7 +32,7 @@ class DebridService(ABC):
     @abstractmethod
     async def get_stream_links(
         self,
-        torrents: AsyncGenerator[Torrent, None],
+        torrents: AsyncGenerator[str, None],
         season_episode: list[int],
         max_results: int = 5,
     ) -> AsyncGenerator[StreamLink, None]:
