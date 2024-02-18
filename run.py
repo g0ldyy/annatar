@@ -24,17 +24,6 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-    resource_attrs_raw: str = os.getenv("OTEL_RESOURCE_ATTRIBUTES", "")
-    if resource_attrs_raw:
-        resource_attrs: list[str] = resource_attrs_raw.split(",")
-        resource_attrs.extend(
-            [
-                f"service.version={BUILD_VERSION}",
-                "service.instance.id=annatar-vm",
-            ]
-        )
-        os.environ["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(resource_attrs)
-
     os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
     if not os.path.isdir(PROM_DIR):
         os.mkdir(PROM_DIR)
