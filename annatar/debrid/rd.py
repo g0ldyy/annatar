@@ -108,7 +108,8 @@ async def _get_stream_for_torrent(
     torrent: Torrent = file_set.torrent
 
     torrent_id: Optional[str] = await api.add_magnet(
-        magnet_link=torrent.url, debrid_token=debrid_token
+        info_hash=torrent.info_hash,
+        debrid_token=debrid_token,
     )
 
     if not torrent_id:

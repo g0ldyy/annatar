@@ -1,6 +1,4 @@
-from typing import Optional
-
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Torrent(BaseModel):
@@ -8,7 +6,7 @@ class Torrent(BaseModel):
     info_hash: str
     size: int
     title: str
-    url: str
     seeders: int
-    tracker: Optional[str] = None
-    imdb: Optional[int] = None
+    tracker: str | None = None
+    imdb: int | None = None
+    match_score: int = Field(0, exclude=True)
