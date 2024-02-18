@@ -83,13 +83,13 @@ async def _search(
 
     links: list[StreamLink] = []
 
-    async for link in debrid.get_stream_links(
+    async for link in debrid.get_stream_links(  # type: ignore
         torrents=async_torrents,
         season_episode=season_episode,
         max_results=max_results,
     ):
-        if human.score_by_quality(link.name) > 0:
-            links.append(link)
+        if human.score_by_quality(link.name) > 0:  # type: ignore
+            links.append(link)  # type: ignore
 
     sorted_links: list[StreamLink] = list(
         sorted(
