@@ -29,7 +29,7 @@ async def make_request(
         async with aiohttp.ClientSession() as session:
             api_headers = {"Authorization": f"Bearer {debrid_token}"}
             async with session.request(method, api_url, headers=api_headers, data=body) as response:
-                status_code = f"{response.status//100}xx"  # type: ignore
+                status_code = f"{response.status//100}xx"
                 if response.status not in range(200, 300):
                     error = True
                     log.error(

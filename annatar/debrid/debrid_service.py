@@ -14,20 +14,16 @@ class DebridService(ABC):
         self.api_key = api_key
 
     @abstractmethod
-    def shared_cache(self) -> bool:
-        pass
+    def shared_cache(self) -> bool: ...
 
     @abstractmethod
-    def short_name(self) -> str:
-        pass
+    def short_name(self) -> str: ...
 
     @abstractmethod
-    def name(self) -> str:
-        pass
+    def name(self) -> str: ...
 
     @abstractmethod
-    def id(self) -> str:
-        pass
+    def id(self) -> str: ...
 
     @abstractmethod
     async def get_stream_links(
@@ -35,5 +31,4 @@ class DebridService(ABC):
         torrents: AsyncGenerator[str, None],
         season_episode: list[int],
         max_results: int = 5,
-    ) -> AsyncGenerator[StreamLink, None]:
-        pass
+    ) -> AsyncGenerator[StreamLink, None]: ...
