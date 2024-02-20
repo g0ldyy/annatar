@@ -46,7 +46,6 @@ WORKDIR /app
 COPY --from=builder /app/dist/*.whl /tmp/wheels/
 COPY --from=builder /tmp/wheels/*.whl /tmp/wheels/
 
-CMD ["/bin/bash"]
 # # Install the application package along with all dependencies
 RUN pip install /tmp/wheels/*.whl && rm -rf /tmp/wheels
 

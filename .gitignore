@@ -1,3 +1,5 @@
 cache.db*
 annatar.db*
 *.env
+.docker
+dist

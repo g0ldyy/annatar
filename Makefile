@@ -7,21 +7,23 @@ ifdef CI_REGISTRY_IMAGE
 	IMAGE_NAME := $(CI_REGISTRY_IMAGE)
 endif
 
-ARCH_SUFFIX      = $(shell echo $(BUILD_ARCH) | cut -d '/' -f2)
-DOCKERFILE      ?= Dockerfile
-DOCKER_PUSH     ?= --load # set this to --push to push --load to load it into the local registry
-DOCKER_TAG      := $(IMAGE_NAME):$(IMAGE_TAG)
-DOCKER_TAG_ARCH := $(DOCKER_TAG)-$(ARCH_SUFFIX)
+ARCH_SUFFIX       = $(shell echo $(BUILD_ARCH) | cut -d '/' -f2)
+DOCKERFILE       ?= Dockerfile
+DOCKER_PUSH      ?= --load # set this to --push to push --load to load it into the local registry
+DOCKER_TAG       := $(IMAGE_NAME):$(IMAGE_TAG)
+DOCKER_TAG_ARCH  := $(DOCKER_TAG)-$(ARCH_SUFFIX)
+DOCKER_CACHE_DIR ?= .docker/$(BUILD_ARCH)
 
 PYTEST_FLAGS ?= 
 
+
 # Build and push container for BUILD_ARCH
 container:
-	-docker pull --platform $(BUILD_ARCH) $(DOCKER_TAG)
 	docker build --platform $(BUILD_ARCH) \
 		--build-arg BUILD_VERSION=$(shell git describe --tags) \
 		$(DOCKER_PUSH) \
-		--cache-from="type=registry,ref=$(DOCKER_TAG)" \
+		--cache-from=type=local,src=$(DOCKER_CACHE_DIR) \
+		--cache-to=type=local,dest=$(DOCKER_CACHE_DIR),mode=max \
 		-f $(DOCKERFILE) \
 		-t $(DOCKER_TAG_ARCH) .
 
