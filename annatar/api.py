@@ -108,6 +108,7 @@ async def _search(
             )
             title += f" {meta.episodeName}" if meta.episodeName else ""
 
+        title += "\n"  # newline to put meta below the title
         title += f" 📺{meta.resolution}" if meta.resolution else ""
         title += f" 🔊{meta.audio}" if meta.audio else ""
         title += f" {meta.codec}" if meta.codec else ""
