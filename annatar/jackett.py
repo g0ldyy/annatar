@@ -373,7 +373,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
             cached_response = True
             return info_hash
 
-        log.info("magnet resolve: following redirect", guid=guid, link=link)
+        log.debug("magnet resolve: following redirect", guid=guid, link=link)
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 link, allow_redirects=False, timeout=JACKETT_TIMEOUT
@@ -382,18 +382,21 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
                 if response.status == 302:
                     if location := response.headers.get("Location", ""):
                         info_hash = magnet.parse_magnet_link(location)
-                        log.info("magnet resolve: found redirect", guid=guid, info_hash=info_hash)
+                        log.debug(
+                            "magnet resolve: found redirect", info_hash=info_hash, location=location
+                        )
                         await db.set(cache_key, info_hash, ttl=timedelta(weeks=8))
                         return info_hash
                     return None
                 else:
-                    log.info("magnet resolve: no redirect found", guid=guid, status=response.status)
+                    log.warn("magnet resolve: no redirect found", guid=guid, status=response.status)
                     return None
     except TimeoutError:
-        log.error("magnet resolve: timeout", guid=guid)
+        log.warn("magnet resolve: timeout")
         return None
     except asyncio.exceptions.CancelledError:
-        pass
+        log.debug("magnet resolve: cancelled")
+        return None
     except Exception as err:
         log.error("magnet resolve error", exc_info=err)
         return None
