@@ -8,7 +8,7 @@ ifdef CI_REGISTRY_IMAGE
 endif
 
 ARCH_SUFFIX      = $(shell echo $(BUILD_ARCH) | cut -d '/' -f2)
-DOCKERFILE      ?= Dockerfile.$(ARCH_SUFFIX)
+DOCKERFILE      ?= Dockerfile
 DOCKER_PUSH     ?= --load # set this to --push to push --load to load it into the local registry
 DOCKER_TAG      := $(IMAGE_NAME):$(IMAGE_TAG)
 DOCKER_TAG_ARCH := $(DOCKER_TAG)-$(ARCH_SUFFIX)
