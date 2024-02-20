@@ -18,9 +18,6 @@ router = APIRouter()
 
 log = structlog.get_logger(__name__)
 
-jackett_url: str = os.environ.get("JACKETT_URL", "http://localhost:9117")
-jackett_api_key: str = os.environ.get("JACKETT_API_KEY", "")
-
 
 class MediaType(str, Enum):
     movie = "movie"
@@ -66,10 +63,13 @@ async def get_manifest(request: Request) -> dict[str, Any]:
 @router.get("/api/v2/hashes/{imdb_id:str}", description="Get hashes for a given IMDB ID")
 async def get_hashes(
     imdb_id: Annotated[str, Path(description="IMDB ID", examples=["tt0120737"])],
-    limit: Annotated[int, Query(description="Limit results", defualt=10)],
+    limit: Annotated[int, Query(description="Limit results", defualt=10)] = 10,
+    season: Annotated[int | None, Query(description="Season", defualt=None)] = None,
+    episode: Annotated[int | None, Query(description="Episode", defualt=None)] = None,
 ) -> dict[str, Any]:
+    hashes = await api.get_hashes(imdb_id=imdb_id, limit=limit, season=season, episode=episode)
     return {
-        "hashes": await api.get_hashes(imdb_id=imdb_id, limit=limit),
+        "hashes": [v.value for v in hashes],
     }
 
 
@@ -125,8 +125,6 @@ async def list_streams(
         debrid=debrid,
         imdb_id=imdb_id,
         season_episode=season_episode,
-        jackett_api_key=jackett_api_key,
-        jackett_url=jackett_url,
         max_results=config.max_results,
         indexers=config.indexers,
     )

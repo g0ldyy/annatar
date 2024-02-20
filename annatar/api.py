@@ -1,6 +1,10 @@
+import asyncio
+import math
 import re
+from collections import defaultdict
 from datetime import datetime, timedelta
 from hashlib import md5
+from itertools import chain
 from typing import Optional
 
 import structlog
@@ -13,6 +17,7 @@ from annatar.debrid.providers import DebridService
 from annatar.jackett_models import Indexer, SearchQuery
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
+from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
 
@@ -26,8 +31,6 @@ UNIQUE_SEARCHES: Counter = Counter(
 async def _search(
     type: str,
     max_results: int,
-    jackett_url: str,
-    jackett_api_key: str,
     debrid: DebridService,
     imdb_id: str,
     season_episode: list[int] = [],
@@ -36,23 +39,6 @@ async def _search(
     if await db.unique_add("stream_request", f"{imdb_id}:{season_episode}"):
         log.debug("unique search")
         UNIQUE_SEARCHES.inc()
-
-    idx: str = "-".join(sorted(indexers))
-    cache_key: str = f"api:search:{type}:{imdb_id}:{season_episode}:{debrid.id()}:{idx}"
-
-    if not debrid.shared_cache():
-        # since some debrid providers (RD) have to have goofy work arounds
-        # for getting direct links we have to cache the results only for their
-        # api key.
-        hashed_api_key: str = md5(debrid.api_key.encode()).hexdigest()
-        cache_key = f"{cache_key}:{hashed_api_key}"
-
-    cached: Optional[StreamResponse] = await db.get_model(cache_key, StreamResponse)
-    if cached:
-        return StreamResponse(
-            streams=cached.streams[:max_results],
-            cached=True,
-        )
 
     media_info: Optional[MediaInfo] = await get_media_info(id=imdb_id, type=type)
     if not media_info:
@@ -71,31 +57,41 @@ async def _search(
         q.episode = str(season_episode[1])
 
     found_indexers: list[Indexer | None] = [Indexer.find_by_id(i) for i in indexers]
-    async_torrents = jackett.search_indexers(
-        jackett_url=jackett_url,
-        jackett_api_key=jackett_api_key,
+    torrents = await jackett.search_indexers(
         search_query=q,
         imdb=int(imdb_id.replace("tt", "")),
-        timeout=60,
-        indexers=[i for i in found_indexers if i],
-        max_results=max_results,
+        indexers=[i for i in found_indexers if i and i.supports(type)],
     )
 
-    links: list[StreamLink] = []
-
+    resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
+    total_links: int = 0
+    total_processed: int = 0
+    stop = asyncio.Event()
     async for link in debrid.get_stream_links(
-        torrents=async_torrents,
+        torrents=torrents,
         season_episode=season_episode,
+        stop=stop,
         max_results=max_results,
     ):
-        if human.score_by_quality(link.name) > 0:
-            links.append(link)
+        total_processed += 1
+        resolution: str = Torrent.parse_title(link.name).resolution
 
+        if len(resolution_links[resolution]) >= math.ceil(max_results / 2):
+            log.debug("max results for resolution", resolution=resolution)
+            continue
+
+        resolution_links[resolution].append(link)
+        total_links += 1
+        if total_links >= max_results:
+            log.debug("max results total")
+            break
+
+    log.debug("found stream links", links=total_links, torrents=total_processed)
     sorted_links: list[StreamLink] = list(
         sorted(
-            links,
-            key=lambda x: human.score_by_quality(x.name),
-            reverse=True,
+            chain(*resolution_links.values()),
+            key=lambda x: human.rank_quality(x.name),
+            reverse=False,
         )
     )
 
@@ -112,9 +108,7 @@ async def _search(
         )
         for link in sorted_links
     ]
-    resp = StreamResponse(streams=streams)
-    await db.set_model(cache_key, resp, ttl=timedelta(hours=1))
-    return resp
+    return StreamResponse(streams=streams)
 
 
 REQUEST_DURATION = Histogram(
@@ -128,17 +122,32 @@ REQUEST_DURATION = Histogram(
 async def get_hashes(
     imdb_id: str,
     limit: int = 20,
-):
+    season: int | None = None,
+    episode: int | None = None,
+) -> list[db.ScoredItem]:
     cache_key: str = f"jackett:search:{imdb_id}"
-    res = await db.unique_list_get(cache_key)
-    return res[:limit]
+    if not season and not episode:
+        res = await db.unique_list_get_scored(f"{cache_key}:torrents")
+        return res[:limit]
+    if season and episode:
+        cache_key += f":{season}:{episode}"
+        res = await db.unique_list_get_scored(cache_key)
+        return res[:limit]
+    else:
+        items: dict[str, db.ScoredItem] = {}
+        cache_key += f":{season}:*"
+        keys = await db.list_keys(f"{cache_key}:*")
+        for values in asyncio.gather(asyncio.create_task(db.unique_list_get(key)) for key in keys):
+            for value in values:
+                items[value.value] = value
+                if len(items) >= limit:
+                    return list(items.values())[:limit]
+        return list(items.values())[:limit]
 
 
 async def search(
     type: str,
     max_results: int,
-    jackett_url: str,
-    jackett_api_key: str,
     debrid: DebridService,
     imdb_id: str,
     season_episode: list[int] = [],
@@ -150,8 +159,6 @@ async def search(
         res = await _search(
             type=type,
             max_results=max_results,
-            jackett_url=jackett_url,
-            jackett_api_key=jackett_api_key,
             debrid=debrid,
             imdb_id=imdb_id,
             season_episode=season_episode,

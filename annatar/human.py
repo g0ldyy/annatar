@@ -1,6 +1,7 @@
 import re
 
 import structlog
+from pydantic import BaseModel
 
 from annatar.jackett_models import SearchQuery
 
@@ -129,7 +130,7 @@ def has_episode(name: str, episode: str) -> bool:
     return int(episode) == get_episode(name)
 
 
-def score_by_quality(name: str) -> int:
+def rank_quality(name: str) -> int:
     """
     Sort items by quality
     """

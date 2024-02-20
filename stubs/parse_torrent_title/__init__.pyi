@@ -1,0 +1,3 @@
+from typing import Dict, Any
+
+def parse(title: str) -> Dict[str, Any]: ...

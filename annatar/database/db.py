@@ -1,7 +1,9 @@
 import asyncio
 import os
+import sys
+from collections import defaultdict
 from datetime import timedelta
-from typing import Optional, Type, TypeVar
+from typing import AsyncGenerator, Optional, Tuple, Type, TypeVar
 
 import structlog
 from prometheus_client import Histogram
@@ -46,6 +48,11 @@ async def get_model(key: str, model: Type[T], force: bool = False) -> Optional[T
         return None
 
 
+@REQUEST_DURATION.labels("KEYS").time()
+async def list_keys(pattern: str) -> list[str]:
+    return [key.decode("utf-8") for key in redis.keys(pattern)]
+
+
 @REQUEST_DURATION.labels("ZADD").time()
 async def unique_list_add(
     name: str,
@@ -56,29 +63,82 @@ async def unique_list_add(
     added: int = redis.zadd(name, {item: score})
     if ttl.total_seconds() > 0:
         log.debug("setting ttl for unique list", name=name, ttl=ttl)
-        redis.expire(name, time=ttl)
+        await set_ttl(name, ttl)
     return bool(added)
 
 
+class ScoredItem(BaseModel):
+    value: str
+    score: int
+
+
 @REQUEST_DURATION.labels("ZRANGE").time()
-async def unique_list_get(name: str) -> list[str]:
+async def unique_list_get(
+    name: str,
+    min_score: int = 0,
+    max_score: int = sys.maxsize,
+    limit: int = sys.maxsize,
+) -> list[str]:
     try:
-        return [
-            i.decode("utf-8")  # type: ignore
-            for i in redis.zrevrange(  # type: ignore
-                name=name,
-                start=0,
-                end=-1,
-                withscores=False,
-            )
+        results = [
+            item.value for item in await unique_list_get_scored(name, min_score, max_score, limit)
         ]
+        log.debug("returned items from unique list", count=len(results), name=name)
+        return results
+    except Exception as e:
+        log.error("failed to get unique list", name=name, exc_info=e)
+        return []
+
+
+@REQUEST_DURATION.labels("ZRANGE").time()
+async def unique_list_get_scored(
+    name: str,
+    min_score: int = 0,
+    max_score: int = sys.maxsize,
+    limit: int = sys.maxsize,
+    limit_per_score: int = sys.maxsize,
+) -> list[ScoredItem]:
+    try:
+        results: dict[int, list[ScoredItem]] = defaultdict(list)
+        redis_items = redis.zrange(
+            name=name,
+            start=max_score,
+            end=min_score,
+            desc=True,
+            withscores=True,
+            byscore=True,
+            num=limit,
+            offset=0,
+        )
+        log.debug(
+            "zrange list",
+            count=len(redis_items),
+            name=name,
+            start=min_score,
+            end=max_score,
+            desc=True,
+            withscores=True,
+            byscore=True,
+            num=limit,
+            offset=0,
+        )
+        for i in redis_items:
+            score = int(i[1])
+            if len(results[score]) < limit_per_score:
+                results[score].append(ScoredItem(score=score, value=i[0].decode("utf-8")))
+        log.debug("returned items from unique list", count=len(results), name=name)
+        return [item for sublist in results.values() for item in sublist]
     except Exception as e:
         log.error("failed to get unique list", name=name, exc_info=e)
         return []
 
 
 async def set_model(key: str, model: BaseModel, ttl: timedelta) -> bool:
-    return await set(key, model.model_dump_json(exclude_none=True), ttl=ttl)
+    return await set(
+        key,
+        model.model_dump_json(exclude_none=True, exclude_defaults=True),
+        ttl=ttl,
+    )
 
 
 @REQUEST_DURATION.labels("EXPIRE").time()
@@ -113,21 +173,24 @@ async def unique_add(key: str, value: str) -> bool:
 
 
 @REQUEST_DURATION.labels("SET").time()
-async def set(key: str, value: str, ttl: timedelta) -> bool:
+async def set(key: str, value: str, ttl: timedelta | None = None) -> bool:
     try:
-        if redis.set(key, value, ex=int(ttl.total_seconds())):
-            return True
-        return False
+        return bool(redis.set(key, value, ex=ttl))
     except Exception as e:
         log.error("failed to set cache", key=key, exc_info=e)
         return False
 
 
+@REQUEST_DURATION.labels("TTL").time()
+async def ttl(key: str) -> int:
+    return redis.ttl(key)
+
+
 @REQUEST_DURATION.labels("GET").time()
 async def get(key: str, force: bool = False) -> Optional[str]:
     try:
-        if bypass := instrumentation.NO_CACHE.get(False):
-            log.debug("cache bypassed", key=key, bypass=bypass)
+        if force or instrumentation.NO_CACHE.get(False):
+            log.debug("cache bypassed", key=key)
             return None
         res: Optional[bytes] = redis.get(key)  # type: ignore
         if not res:

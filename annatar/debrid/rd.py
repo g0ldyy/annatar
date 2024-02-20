@@ -233,46 +233,46 @@ async def get_stream_link(
             model=InstantFileSet(info_hash=info_hash, file_ids=[f.id for f in cached_files]),
             ttl=timedelta(hours=8),
         )
+
+        title = await db.get(f"torrent:{info_hash}:name") or file.filename
         return StreamLink(
             size=file.filesize,
-            name=file.filename,
+            name=title,
             url=url,
         )
 
 
-@timestamped()
 async def get_stream_links(
-    torrents: AsyncGenerator[str, None],
+    torrents: list[str],
     debrid_token: str,
+    stop: asyncio.Event,
+    max_results: int,
     season_episode: list[int] = [],
-    max_results: int = 5,
-    timeout: int = 10,
 ) -> AsyncGenerator[StreamLink, None]:
     """
     Generates a list of RD links for each torrent link.
     """
+    links: dict[str, bool] = {}
+    concurrency = max_results * 3
+    grouped = [torrents[i : i + concurrency] for i in range(0, len(torrents), concurrency)]
 
-    links: dict[str, StreamLink] = {}
-    tasks = [
-        asyncio.create_task(
-            get_stream_link(
-                info_hash=info_hash,
-                season_episode=season_episode,
-                debrid_token=debrid_token,
+    for group in grouped:
+        if stop.is_set():
+            return
+        tasks = [
+            asyncio.create_task(
+                get_stream_link(
+                    info_hash=info_hash,
+                    season_episode=season_episode,
+                    debrid_token=debrid_token,
+                )
             )
-        )
-        async for info_hash in torrents
-    ]
+            for info_hash in group
+        ]
 
-    for task in asyncio.as_completed(tasks, timeout=timeout):
-        link: Optional[StreamLink] = await task
-        if link and link.url not in links:
-            links[link.url] = link
-            yield link
-            if len(links) >= max_results:
-                break
-
-    # Cancel remaining tasks
-    for task in tasks:
-        if not task.done():
-            task.cancel()
+        for task in asyncio.as_completed(tasks):
+            link = await task
+            if link:
+                yield link
+            if stop.is_set():
+                return

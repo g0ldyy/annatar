@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
@@ -28,7 +29,8 @@ class DebridService(ABC):
     @abstractmethod
     async def get_stream_links(
         self,
-        torrents: AsyncGenerator[str, None],
+        torrents: list[str],
         season_episode: list[int],
-        max_results: int = 5,
+        stop: asyncio.Event,
+        max_results: int,
     ) -> AsyncGenerator[StreamLink, None]: ...

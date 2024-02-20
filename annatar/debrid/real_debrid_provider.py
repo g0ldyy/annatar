@@ -1,3 +1,4 @@
+import asyncio
 from typing import AsyncGenerator, Optional
 
 from annatar.debrid import rd
@@ -23,14 +24,16 @@ class RealDebridProvider(DebridService):
 
     async def get_stream_links(
         self,
-        torrents: AsyncGenerator[str, None],
+        torrents: list[str],
         season_episode: list[int],
-        max_results: int = 5,
+        stop: asyncio.Event,
+        max_results: int,
     ) -> AsyncGenerator[StreamLink, None]:
         async for sl in rd.get_stream_links(
             torrents=torrents,
             debrid_token=self.api_key,
             season_episode=season_episode,
+            stop=stop,
             max_results=max_results,
         ):
             yield sl
