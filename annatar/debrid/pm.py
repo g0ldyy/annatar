@@ -37,7 +37,11 @@ async def select_stream_file(
         meta: Torrent = Torrent.parse_title(path)
         if meta.is_season_episode(season=season, episode=episode):
             log.debug("path matches season and episode", path=path, season_episode=season_episode)
-            return StreamLink(name=file.path.split("/")[-1], size=file.size, url=file.link)
+            return StreamLink(
+                name=file.path.split("/")[-1],
+                size=file.size,
+                url=file.link,
+            )
     log.info("no file found for season and episode", season_episode=season_episode)
     return None
 

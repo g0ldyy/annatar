@@ -234,10 +234,9 @@ async def get_stream_link(
             ttl=timedelta(hours=8),
         )
 
-        title = await db.get(f"torrent:{info_hash}:name") or file.filename
         return StreamLink(
             size=file.filesize,
-            name=title,
+            name=file.filename,
             url=url,
         )
 

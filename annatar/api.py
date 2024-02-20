@@ -98,25 +98,30 @@ async def _search(
     streams: list[Stream] = []
     for link in sorted_links:
         meta: Torrent = Torrent.parse_title(link.name)
+        # url decode file name from URL to get the actual file name
+        title: str = f"{meta.title}"
+        if type == "series":
+            title += (
+                f" S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
+                if meta.season and meta.episode
+                else ""
+            )
+            title += f" {meta.episodeName}" if meta.episodeName else ""
+
+        title += f" 📺{meta.resolution}" if meta.resolution else ""
+        title += f" 🔊{meta.audio}" if meta.audio else ""
+        title += f" {meta.codec}" if meta.codec else ""
+        title += f" {meta.quality}" if meta.quality else ""
+        title += f" 💾{human.bytes(float(link.size))}"
+
+        name = f"[{debrid.short_name()}+] Annatar"
+        name += f" {meta.resolution}" if meta.resolution else ""
+        name += f" {meta.audio_channels}" if meta.audio_channels else ""
         streams.append(
             Stream(
-                url=link.url,
-                title="\n".join(
-                    [
-                        link.name,
-                        f"📺{meta.resolution}",
-                        f"🔊{meta.audio}",
-                        f"💾{human.bytes(float(link.size))}",
-                    ]
-                ),
-                name=" ".join(
-                    [
-                        f"[{debrid.short_name()}+]",
-                        "Annatar",
-                        f"{meta.resolution}",
-                        f"{meta.audio_channels}",
-                    ]
-                ).strip(),
+                url=link.url.strip(),
+                title=title.strip(),
+                name=name.strip(),
             )
         )
 

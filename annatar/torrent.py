@@ -42,6 +42,7 @@ class Torrent(BaseModel):
     title: str
     info_hash: str = ""
     episode: list[int] = []
+    episodeName: str = ""
     season: list[int] = []
     resolution: str = ""
     quality: str = ""
