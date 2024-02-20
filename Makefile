@@ -17,7 +17,7 @@ DOCKER_TAG_ARCH := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 # Build and push container for BUILD_ARCH
 container:
 	docker build --platform $(BUILD_ARCH) \
-		--build-arg BUILD_VERSION=$(shell git rev-parse HEAD) \
+		--build-arg BUILD_VERSION=$(shell git describe --tags) \
 		$(DOCKER_PUSH) \
 		--cache-from $(DOCKER_TAG_ARCH) \
 		-f $(DOCKERFILE) \
