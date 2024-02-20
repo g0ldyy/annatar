@@ -165,7 +165,6 @@ async def unique_count(key: str) -> int:
 async def unique_add(key: str, value: str) -> bool:
     try:
         res = redis.pfadd(key, value)
-        log.debug("redis command", command="PFADD", key=key, value=value, res=res)
         return bool(res)
     except Exception as e:
         log.error("failed to pfadd", key=key, exc_info=e)
@@ -175,7 +174,9 @@ async def unique_add(key: str, value: str) -> bool:
 @REQUEST_DURATION.labels("SET").time()
 async def set(key: str, value: str, ttl: timedelta | None = None) -> bool:
     try:
-        return bool(redis.set(key, value, ex=ttl))
+        # ttl or None
+        # TTL is sometimes already expired such as timedelta(0) but redis doesn't like that
+        return bool(redis.set(key, value, ex=ttl or None))
     except Exception as e:
         log.error("failed to set cache", key=key, exc_info=e)
         return False

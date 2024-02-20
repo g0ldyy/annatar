@@ -19,7 +19,7 @@ services:
       JACKETT_API_KEY: "<Set this value from Jackett>"
       JACKETT_MAX_RESULTS: "10" # max results from jackett search
       JACKETT_TIMEOUT: "5" # max time spent searching per indexer.
-      JACKETT_INDEXERS: "eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,yts"
+      JACKETT_INDEXERS: "yts,eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,bitsearch,limetorrents,badasstorrents"
       LISTEN_PORT: "8000"
 
   jackett:

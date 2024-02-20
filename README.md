@@ -36,7 +36,7 @@ Annatar does not import certificates. You will likely need a reverse proxy such 
 docker run -d -p 8000:8000 -v ./annatar-data:/app/data --name annatar \
 	-e JACKETT_URL=<your jackett URL> \
 	-e JACKETT_API_KEY=<your jackett api key> \
-	-e JACKETT_INDEXERS=eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,yts \
+	-e JACKETT_INDEXERS=eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,yts,badasstorrents,limetorrents,bitsearch \
 	registry.gitlab.com/stremio-add-ons/annatar:latest
 ```
 

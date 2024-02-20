@@ -76,6 +76,9 @@ ALL_INDEXERS: list[Indexer] = [
     Indexer(name="The Pirate Bay", id="thepiratebay", categories=[MOVIES, SERIES]),
     Indexer(name="RARBG", id="therarbg", categories=[MOVIES, SERIES]),
     Indexer(name="Torrent Galaxy", id="torrentgalaxy", categories=[MOVIES, SERIES]),
+    Indexer(name="LimeTorrents", id="limetorrents", categories=[MOVIES, SERIES]),
+    Indexer(name="Badass Torrents", id="badasstorrents", categories=[MOVIES, SERIES]),
+    Indexer(name="BitSearch", id="bitsearch", categories=[MOVIES, SERIES]),
 ]
 
 
