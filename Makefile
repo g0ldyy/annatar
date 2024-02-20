@@ -17,11 +17,11 @@ PYTEST_FLAGS ?=
 
 # Build and push container for BUILD_ARCH
 container:
-	-docker pull --platform $(BUILD_ARCH) $(DOCKER_TAG_ARCH)
+	-docker pull --platform $(BUILD_ARCH) $(DOCKER_TAG)
 	docker build --platform $(BUILD_ARCH) \
 		--build-arg BUILD_VERSION=$(shell git describe --tags) \
 		$(DOCKER_PUSH) \
-		--cache-from="type=registry,ref=$(DOCKER_TAG_ARCH)" \
+		--cache-from="type=registry,ref=$(DOCKER_TAG)" \
 		-f $(DOCKERFILE) \
 		-t $(DOCKER_TAG_ARCH) .
 
