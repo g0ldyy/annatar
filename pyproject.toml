@@ -42,3 +42,9 @@ reportMissingImports = true
 reportUnusedVariable = true
 reportUnusedFunction = true
 reportUnusedImport = true
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning"
+]
