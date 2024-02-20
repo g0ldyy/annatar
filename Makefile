@@ -21,7 +21,7 @@ container:
 	docker build --platform $(BUILD_ARCH) \
 		--build-arg BUILD_VERSION=$(shell git describe --tags) \
 		$(DOCKER_PUSH) \
-		--cache-from $(DOCKER_TAG_ARCH) \
+		--cache-from="type=registry,ref=$(DOCKER_TAG_ARCH)" \
 		-f $(DOCKERFILE) \
 		-t $(DOCKER_TAG_ARCH) .
 
