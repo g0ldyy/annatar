@@ -75,10 +75,9 @@ async def get_instant_availability(
         url_values={"info_hash": info_hash},
         debrid_token=debrid_token,
     )
-    if not res:
-        yield []
+    if res is None:
+        return
 
-    # XXX This doesn't work. .get is wrong
     for hash, obj in res.items():
         if hash.lower() != info_hash.lower():
             continue
