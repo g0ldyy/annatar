@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional, Tuple, Type, TypeVar
 import structlog
 from prometheus_client import Histogram
 from pydantic import BaseModel, ValidationError
-from redislite import StrictRedis  # type: ignore
+from redislite.client import StrictRedis
 
 from annatar import instrumentation
 
@@ -193,12 +193,12 @@ async def get(key: str, force: bool = False) -> Optional[str]:
         if force or instrumentation.NO_CACHE.get(False):
             log.debug("cache bypassed", key=key)
             return None
-        res: Optional[bytes] = redis.get(key)  # type: ignore
+        res: Optional[bytes] = redis.get(key)
         if not res:
             log.debug("cache miss", key=key)
             return None
         log.debug("cache hit", key=key)
-        return res.decode("utf-8")  # type: ignore
+        return res.decode("utf-8")
     except Exception as e:
         log.error("failed to get cache", key=key, exc_info=e)
         return None
