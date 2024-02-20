@@ -4,7 +4,7 @@ import re
 def parse_magnet_link(uri: str) -> str:
     match = re.search("btih:([a-zA-Z0-9]+)", uri)
     if match:
-        return match.group(1)
+        return match.group(1).upper()
     raise ValueError(f"Invalid magnet link: {uri}")
 
 

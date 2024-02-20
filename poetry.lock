@@ -741,6 +741,18 @@ files = [
 ]
 
 [[package]]
+name = "parse-torrent-title"
+version = "2.8.1"
+description = "Extract media information from torrent-like filename"
+optional = false
+python-versions = "*"
+files = [
+    {file = "parse-torrent-title-2.8.1.tar.gz", hash = "sha256:939647c4bfacd2b3b878503a7bf79fcdbb11e74a895a4550eb84406d62742457"},
+    {file = "parse_torrent_title-2.8.1-py2-none-any.whl", hash = "sha256:0467809b5004065e29c60dfe120499f44832c0be49dc0e7583a1325dd81bbc88"},
+    {file = "parse_torrent_title-2.8.1-py3-none-any.whl", hash = "sha256:b96ee593b25fbf07150066d9d8de488b17c15c92b8b05745f984ff47db7f9fcb"},
+]
+
+[[package]]
 name = "pathspec"
 version = "0.12.1"
 description = "Utility library for gitignore style pattern matching of file paths."
@@ -1349,4 +1361,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "b7cd2eaace3534885b6cf6d0e1958938ef99662b81d9513b4f2285df3aa7a659"
+content-hash = "5985b950f56bf4ac971c8f9a94527c5a22c94dfa6b91436fc0cbf69c209d9b51"

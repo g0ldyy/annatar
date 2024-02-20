@@ -1,0 +1,4 @@
+{
+    "typeStubSearchPaths": ["./stubs"],
+    "include": ["src"]
+}
