@@ -10,12 +10,6 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   DOCKER_PUSH: --push
 
-default:
-  cache:
-      key: cache-$CI_COMMIT_BRANCH
-      paths:
-        - .docker
-
 services:
   - name: docker:dind
     alias: docker

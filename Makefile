@@ -12,7 +12,6 @@ DOCKERFILE       ?= Dockerfile
 DOCKER_PUSH      ?= --load # set this to --push to push --load to load it into the local registry
 DOCKER_TAG       := $(IMAGE_NAME):$(IMAGE_TAG)
 DOCKER_TAG_ARCH  := $(DOCKER_TAG)-$(ARCH_SUFFIX)
-DOCKER_CACHE_DIR ?= .docker/$(BUILD_ARCH)
 
 PYTEST_FLAGS ?= 
 
@@ -22,8 +21,7 @@ container:
 	docker build --platform $(BUILD_ARCH) \
 		--build-arg BUILD_VERSION=$(shell git describe --tags) \
 		$(DOCKER_PUSH) \
-		--cache-from=type=local,src=$(DOCKER_CACHE_DIR) \
-		--cache-to=type=local,dest=$(DOCKER_CACHE_DIR),mode=max \
+		--cache-from=$(DOCKER_TAG_ARCH) \
 		-f $(DOCKERFILE) \
 		-t $(DOCKER_TAG_ARCH) .
 
