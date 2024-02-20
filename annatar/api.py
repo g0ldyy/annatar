@@ -91,7 +91,7 @@ async def _search(
         sorted(
             chain(*resolution_links.values()),
             key=lambda x: human.rank_quality(x.name),
-            reverse=False,
+            reverse=True,
         )
     )
 
