@@ -40,6 +40,7 @@ class Indexer(BaseModel):
     id: str
     name: str
     categories: list[Category]
+    supports_imdb: bool
 
     def supports(self, category: str) -> bool:
         for cat in self.categories:
@@ -70,15 +71,60 @@ class Indexer(BaseModel):
 # and then verify on startup. Jackett will accept incorrect values though and
 # just return no results
 ALL_INDEXERS: list[Indexer] = [
-    Indexer(name="YTS", id="yts", categories=[MOVIES]),
-    Indexer(name="EZTV", id="eztv", categories=[SERIES]),
-    Indexer(name="Kickass Torrents", id="kickasstorrents-ws", categories=[MOVIES, SERIES]),
-    Indexer(name="The Pirate Bay", id="thepiratebay", categories=[MOVIES, SERIES]),
-    Indexer(name="RARBG", id="therarbg", categories=[MOVIES, SERIES]),
-    Indexer(name="Torrent Galaxy", id="torrentgalaxy", categories=[MOVIES, SERIES]),
-    Indexer(name="LimeTorrents", id="limetorrents", categories=[MOVIES, SERIES]),
-    Indexer(name="Badass Torrents", id="badasstorrents", categories=[MOVIES, SERIES]),
-    Indexer(name="BitSearch", id="bitsearch", categories=[MOVIES, SERIES]),
+    Indexer(
+        name="YTS",
+        id="yts",
+        categories=[MOVIES],
+        supports_imdb=True,
+    ),
+    Indexer(
+        name="EZTV",
+        id="eztv",
+        categories=[SERIES],
+        supports_imdb=True,
+    ),
+    Indexer(
+        name="Kickass Torrents",
+        id="kickasstorrents-ws",
+        categories=[MOVIES, SERIES],
+        supports_imdb=False,
+    ),
+    Indexer(
+        name="The Pirate Bay",
+        id="thepiratebay",
+        categories=[MOVIES, SERIES],
+        supports_imdb=True,
+    ),
+    Indexer(
+        name="RARBG",
+        id="therarbg",
+        categories=[MOVIES, SERIES],
+        supports_imdb=False,
+    ),
+    Indexer(
+        name="Torrent Galaxy",
+        id="torrentgalaxy",
+        categories=[MOVIES, SERIES],
+        supports_imdb=True,
+    ),
+    Indexer(
+        name="LimeTorrents",
+        id="limetorrents",
+        categories=[MOVIES, SERIES],
+        supports_imdb=False,
+    ),
+    Indexer(
+        name="Badass Torrents",
+        id="badasstorrents",
+        categories=[MOVIES, SERIES],
+        supports_imdb=False,
+    ),
+    Indexer(
+        name="BitSearch",
+        id="bitsearch",
+        categories=[MOVIES, SERIES],
+        supports_imdb=False,
+    ),
 ]
 
 
@@ -86,6 +132,7 @@ class SearchQuery(BaseModel):
     name: str
     type: str
     year: int
+    imdb_id: str
     season: Optional[str] = None
     episode: Optional[str] = None
 
@@ -108,7 +155,7 @@ class SearchResult(BaseModel):
     Description: Optional[str] = None
     RageID: Optional[str] = None
     TVDBId: Optional[str] = None
-    Imdb: Optional[int] = None
+    Imdb: int | None = 0
     TMDb: Optional[str] = None
     TVMazeId: Optional[str] = None
     TraktId: Optional[str] = None

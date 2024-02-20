@@ -120,7 +120,7 @@ class Torrent(BaseModel):
             self.score_series(season=season, episode=episode) << SEASON_MATCH_BIT_POS
         )
         if season_match_score < 0:
-            return -1000
+            return -100
         resolution_score = (
             score_resolution(self.resolution) << RESOLUTION_BIT_POS if self.resolution else 0
         )

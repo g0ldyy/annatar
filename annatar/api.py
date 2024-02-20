@@ -47,6 +47,7 @@ async def _search(
     log.info("found media info", type=type, id=id, media_info=media_info.model_dump())
 
     q = SearchQuery(
+        imdb_id=imdb_id,
         name=media_info.name,
         type=type,
         year=int(re.split(r"\D", (media_info.releaseInfo or ""))[0]),
@@ -59,7 +60,6 @@ async def _search(
     found_indexers: list[Indexer | None] = [Indexer.find_by_id(i) for i in indexers]
     torrents = await jackett.search_indexers(
         search_query=q,
-        imdb=int(imdb_id.replace("tt", "")),
         indexers=[i for i in found_indexers if i and i.supports(type)],
     )
 

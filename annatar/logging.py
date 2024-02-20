@@ -55,17 +55,7 @@ def timestamped(log_args: list[str] = []):
 
             @wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> R:
-                start_time = datetime.now()
                 result: R = await func(*args, **kwargs)
-                end_time = datetime.now()
-                duration = "{:.4f}s".format((end_time - start_time).total_seconds())
-                logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
-                structlog.get_logger().info(
-                    "execution_time",
-                    function=f"{func.__module__}:{func.__name__}",
-                    duration=duration,
-                    **logged_args,
-                )
                 return result
 
             return async_wrapper
@@ -73,17 +63,7 @@ def timestamped(log_args: list[str] = []):
 
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> R:
-                start_time = datetime.now()
                 result: R = func(*args, **kwargs)
-                end_time = datetime.now()
-                duration = "{:.4f}s".format((end_time - start_time).total_seconds())
-                logged_args = {arg: kwargs[arg] for arg in log_args if arg in kwargs}
-                structlog.get_logger().info(
-                    "execution_time",
-                    function=f"{func.__module__}:{func.__name__}",
-                    duration=duration,
-                    **logged_args,
-                )
                 return result
 
             return wrapper
