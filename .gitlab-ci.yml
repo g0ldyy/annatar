@@ -18,6 +18,11 @@ services:
 test:
   stage: test
   image: python:3.11-slim
+  artifacts:
+    reports:
+      junit: report.xml
+  variables:
+    PYTEST_FLAGS: --junitxml report.xml
   script:
     - apt-get update && apt-get install make
     - pip install poetry

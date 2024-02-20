@@ -13,6 +13,7 @@ DOCKER_PUSH     ?= --load # set this to --push to push --load to load it into th
 DOCKER_TAG      := $(IMAGE_NAME):$(IMAGE_TAG)
 DOCKER_TAG_ARCH := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 
+PYTEST_FLAGS ?= 
 
 # Build and push container for BUILD_ARCH
 container:
@@ -35,5 +36,5 @@ test:
 	poetry run pyright annatar
 	poetry run isort --check --diff annatar run.py
 	poetry run black --check --diff annatar run.py
-	poetry run pytest
+	poetry run pytest $(PYTEST_FLAGS)
 
