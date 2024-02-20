@@ -73,6 +73,14 @@ class Torrent(BaseModel):
         meta["raw_title"] = title
         return Torrent(**meta)
 
+    @property
+    def audio_channels(self) -> str:
+        if "7.1" in self.audio:
+            return "7.1"
+        if "5.1" in self.audio:
+            return "5.1"
+        return ""
+
     def is_season_episode(self, season: int, episode: int) -> bool:
         return self.score_series(season=season, episode=episode) > 0
 

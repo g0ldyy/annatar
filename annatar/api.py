@@ -95,19 +95,31 @@ async def _search(
         )
     )
 
-    streams: list[Stream] = [
-        Stream(
-            title="\n".join(
-                [
-                    link.name,
-                    f"💾{human.bytes(float(link.size))}",
-                ]
-            ),
-            url=link.url,
-            name=f"[{debrid.short_name()}+] {human.grep_quality(link.name)}",
+    streams: list[Stream] = []
+    for link in sorted_links:
+        meta: Torrent = Torrent.parse_title(link.name)
+        streams.append(
+            Stream(
+                url=link.url,
+                title="\n".join(
+                    [
+                        link.name,
+                        f"📺{meta.resolution}",
+                        f"🔊{meta.audio}",
+                        f"💾{human.bytes(float(link.size))}",
+                    ]
+                ),
+                name=" ".join(
+                    [
+                        f"[{debrid.short_name()}+]",
+                        "Annatar",
+                        f"{meta.resolution}",
+                        f"{meta.audio_channels}",
+                    ]
+                ).strip(),
+            )
         )
-        for link in sorted_links
-    ]
+
     return StreamResponse(streams=streams)
 
 
