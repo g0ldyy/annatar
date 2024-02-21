@@ -3,7 +3,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import timedelta
-from typing import AsyncGenerator, Optional, Tuple, Type, TypeVar
+from typing import AsyncGenerator, Callable, Coroutine, Optional, Tuple, Type, TypeVar
 
 import structlog
 from prometheus_client import Counter, Histogram
@@ -14,7 +14,6 @@ from annatar import instrumentation
 
 log = structlog.get_logger(__name__)
 
-T = TypeVar("T", bound=BaseModel)
 
 DB_PATH = os.environ.get("DB_PATH", "annatar.db")
 REDIS_URL = os.environ.get("REDIS_URL", "")
@@ -30,17 +29,22 @@ REQUEST_DURATION = Histogram(
     registry=instrumentation.registry(),
 )
 
-CACHE_MISS = Counter(
-    name="redis_cache_miss",
-    documentation="number of cache misses",
+CACHE_REQUEST = Counter(
+    name="redis_cache_request",
+    documentation="number of cache requests",
     registry=instrumentation.registry(),
+    labelnames=["result"],
 )
 
-CACHE_HIT = Counter(
-    name="redis_cache_hit",
-    documentation="number of cache hits",
-    registry=instrumentation.registry(),
-)
+T = TypeVar("T")
+
+
+async def measure_hits(key: str, task: Callable[[], Coroutine[None, None, T]]) -> T:
+    result: T = await task()
+    label: str = "hit" if result else "miss"
+    CACHE_REQUEST.labels(result=label).inc()
+    log.debug(f"cache {label}", key=key)
+    return result
 
 
 @REQUEST_DURATION.labels("PING").time()
@@ -49,7 +53,10 @@ async def ping() -> bool:
     return True
 
 
-async def get_model(key: str, model: Type[T], force: bool = False) -> Optional[T]:
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
+
+
+async def get_model(key: str, model: Type[TBaseModel], force: bool = False) -> Optional[TBaseModel]:
     res: Optional[str] = await get(key, force=force)
     if res is None:
         return None
@@ -84,8 +91,17 @@ class ScoredItem(BaseModel):
     score: int
 
 
-@REQUEST_DURATION.labels("ZRANGE").time()
 async def unique_list_get(
+    name: str,
+    min_score: int = 0,
+    max_score: int = sys.maxsize,
+    limit: int = sys.maxsize,
+) -> list[str]:
+    return await measure_hits(name, lambda: _unique_list_get(name, min_score, max_score, limit))
+
+
+@REQUEST_DURATION.labels("ZRANGE").time()
+async def _unique_list_get(
     name: str,
     min_score: int = 0,
     max_score: int = sys.maxsize,
@@ -102,8 +118,21 @@ async def unique_list_get(
         return []
 
 
-@REQUEST_DURATION.labels("ZRANGE").time()
 async def unique_list_get_scored(
+    name: str,
+    min_score: int = 0,
+    max_score: int = sys.maxsize,
+    limit: int = sys.maxsize,
+    limit_per_score: int = sys.maxsize,
+) -> list[ScoredItem]:
+    return await measure_hits(
+        name,
+        lambda: _unique_list_get_scored(name, min_score, max_score, limit, limit_per_score),
+    )
+
+
+@REQUEST_DURATION.labels("ZRANGE").time()
+async def _unique_list_get_scored(
     name: str,
     min_score: int = 0,
     max_score: int = sys.maxsize,
@@ -116,18 +145,6 @@ async def unique_list_get_scored(
             name=name,
             start=max_score,
             end=min_score,
-            desc=True,
-            withscores=True,
-            byscore=True,
-            num=limit,
-            offset=0,
-        )
-        log.debug(
-            "zrange list",
-            count=len(redis_items),
-            name=name,
-            start=min_score,
-            end=max_score,
             desc=True,
             withscores=True,
             byscore=True,
@@ -164,12 +181,16 @@ async def set_ttl(key: str, ttl: timedelta) -> bool:
         return False
 
 
-@REQUEST_DURATION.labels("PFCOUNT").time()
 async def unique_count(key: str) -> int:
+    return await measure_hits(key, lambda: _unique_count(key))
+
+
+@REQUEST_DURATION.labels("PFCOUNT").time()
+async def _unique_count(key: str) -> int:
     try:
         return redis.pfcount(key)
     except Exception as e:
-        log.error("failed to pfadd", key=key, exc_info=e)
+        log.error("failed to pfcount", key=key, exc_info=e)
         return False
 
 
@@ -199,23 +220,21 @@ async def ttl(key: str) -> int:
     return redis.ttl(key)
 
 
-@REQUEST_DURATION.labels("GET").time()
 async def get(key: str, force: bool = False) -> Optional[str]:
+    return await measure_hits(key, lambda: _get(key, force=force))
+
+
+@REQUEST_DURATION.labels("GET").time()
+async def _get(key: str, force: bool = False) -> Optional[str]:
     try:
         if force or instrumentation.NO_CACHE.get(False):
             log.debug("cache bypassed", key=key)
             return None
-        res: Optional[bytes] = redis.get(key)
-        if not res:
-            log.debug("cache miss", key=key)
-            return None
-            CACHE_MISS.inc()
-        log.debug("cache hit", key=key)
-        CACHE_HIT.inc()
-        return res.decode("utf-8")
+        if res := redis.get(key):
+            return res.decode("utf-8")
+        return None
     except Exception as e:
         log.error("failed to get cache", key=key, exc_info=e)
-        CACHE_MISS.inc()
         return None
 
 
