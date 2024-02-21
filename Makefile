@@ -15,6 +15,10 @@ DOCKER_TAG_ARCH  := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 
 PYTEST_FLAGS ?= 
 
+CURRENT_GIT_TAG := $(shell git describe --tags --abbrev=0)
+NEW_GIT_TAG     := $(shell git describe --tags --abbrev=0 | awk -F. '{$NF+=1; OFS="."; $1=$1; print $0}')
+NEW_GIT_TAG     := $(shell git describe --tags --abbrev=0 | awk -F. '{$NF+=1; OFS="."; $1=$1; print $0}')
+RELEASE_NOTES   := $(shell git log --graph --format='%h - %s' --abbrev-commit $(CURRENT_GIT_TAG)..HEAD)
 
 # Build and push container for BUILD_ARCH
 container:
@@ -37,4 +41,7 @@ test:
 	poetry run isort --check --diff annatar run.py
 	poetry run black --check --diff annatar run.py
 	poetry run pytest $(PYTEST_FLAGS)
+
+
+release:
 
