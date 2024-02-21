@@ -101,11 +101,11 @@ async def _search(
         torrent_name_parts: list[str] = [f"{meta.title}"]
         if type == "series":
             torrent_name_parts.append(
-                f" S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
+                f"S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
                 if meta.season and meta.episode
                 else ""
             )
-            torrent_name_parts.append(f" {meta.episodeName}" if meta.episodeName else "")
+            torrent_name_parts.append(f"{meta.episodeName}" if meta.episodeName else "")
 
         torrent_name: str = " ".join(torrent_name_parts)
         # squish the title portion before appending more parts
