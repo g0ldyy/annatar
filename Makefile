@@ -56,10 +56,11 @@ release: RELEASE_NOTES.txt
 	@echo
 	@echo -e "Version: $(RELEASE_VERSION)\nRelease Notes:"
 	@cat $<
-	@echo 
+	@echo
 	@$(MAKE) --no-print-directory confirm
 	$(GLAB_CMD) release create $(RELEASE_VERSION) \
 		-r master \
 		--name "$(RELEASE_VERSION)" \
 		--notes-file $<
+	@git fetch --tags
 
