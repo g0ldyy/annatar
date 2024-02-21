@@ -1,5 +1,3 @@
-SHELL := /bin/bash
-
 GLAB_CMD   ?= glab
 IMAGE_NAME ?= annatar
 IMAGE_TAG  ?= latest
