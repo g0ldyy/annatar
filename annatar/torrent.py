@@ -99,7 +99,7 @@ class Torrent(BaseModel):
             return 0
         if self.season and season not in self.season:
             # season mismatch
-            return -10
+            return -100
         if self.episode and episode not in self.episode:
             # episode mismatch
             return -10
@@ -115,7 +115,7 @@ class Torrent(BaseModel):
         if season in self.season and episode in self.episode:
             # single episode matches
             return 1
-        return -10
+        return -1
 
     def matches_name(self, title: str) -> bool:
         sanitized_name: str = re.sub(r"\W+", r"\\W+", title)
@@ -129,7 +129,7 @@ class Torrent(BaseModel):
             self.score_series(season=season, episode=episode) << SEASON_MATCH_BIT_POS
         )
         if season_match_score < 0:
-            return -100
+            return season_match_score
         resolution_score = (
             score_resolution(self.resolution) << RESOLUTION_BIT_POS if self.resolution else 0
         )
