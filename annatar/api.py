@@ -98,22 +98,28 @@ async def _search(
     streams: list[Stream] = []
     for link in sorted_links:
         meta: Torrent = Torrent.parse_title(link.name)
-        # url decode file name from URL to get the actual file name
-        title: str = f"{meta.title}"
+        torrent_name_parts: list[str] = [f"{meta.title}"]
         if type == "series":
-            title += (
+            torrent_name_parts.append(
                 f" S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
                 if meta.season and meta.episode
                 else ""
             )
-            title += f" {meta.episodeName}" if meta.episodeName else ""
+            torrent_name_parts.append(f" {meta.episodeName}" if meta.episodeName else "")
 
-        title += "\n"  # newline to put meta below the title
-        title += f" 📺{meta.resolution}" if meta.resolution else ""
-        title += f" 🔊{meta.audio}" if meta.audio else ""
-        title += f" {meta.codec}" if meta.codec else ""
-        title += f" {meta.quality}" if meta.quality else ""
-        title += f" 💾{human.bytes(float(link.size))}"
+        torrent_name: str = " ".join(torrent_name_parts)
+        # squish the title portion before appending more parts
+        meta_parts: list[str] = []
+        if meta.resolution:
+            meta_parts.append(f"📺{meta.resolution}")
+        if meta.audio_channels:
+            meta_parts.append(f"🔊{meta.audio_channels}")
+        if meta.codec:
+            meta_parts.append(f"{meta.codec}")
+        if meta.quality:
+            meta_parts.append(f"{meta.quality}")
+
+        meta_parts.append(f"💾{human.bytes(float(link.size))}")
 
         name = f"[{debrid.short_name()}+] Annatar"
         name += f" {meta.resolution}" if meta.resolution else ""
@@ -121,12 +127,25 @@ async def _search(
         streams.append(
             Stream(
                 url=link.url.strip(),
-                title=title.strip(),
+                title="\n".join(
+                    [
+                        torrent_name,
+                        arrange_into_rows(strings=meta_parts, rows=2),
+                    ]
+                ),
                 name=name.strip(),
             )
         )
 
     return StreamResponse(streams=streams)
+
+
+def arrange_into_rows(strings: list[str], rows: int) -> str:
+    split_index = (len(strings) + 1) // rows
+    first_row = strings[:split_index]
+    second_row = strings[split_index:]
+    arranged_string = "\n".join([" ".join(first_row), " ".join(second_row)])
+    return arranged_string
 
 
 REQUEST_DURATION = Histogram(

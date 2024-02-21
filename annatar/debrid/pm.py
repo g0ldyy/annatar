@@ -65,8 +65,6 @@ async def get_stream_link(
     stream_link = await select_stream_file(dl.content, season_episode)
     if not stream_link:
         return None
-    if title := await db.get(f"torrent:{info_hash}:name"):
-        stream_link.name = title
 
     return stream_link
 
