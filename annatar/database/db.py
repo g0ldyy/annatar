@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import AsyncGenerator, Optional, Tuple, Type, TypeVar
 
 import structlog
-from prometheus_client import Histogram
+from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ValidationError
 from redislite.client import StrictRedis
 
@@ -27,6 +27,18 @@ REQUEST_DURATION = Histogram(
     name="redis_command_duration_seconds",
     documentation="Duration of Redis requests in seconds",
     labelnames=["command"],
+    registry=instrumentation.registry(),
+)
+
+CACHE_MISS = Counter(
+    name="redis_cache_miss",
+    documentation="number of cache misses",
+    registry=instrumentation.registry(),
+)
+
+CACHE_HIT = Counter(
+    name="redis_cache_hit",
+    documentation="number of cache hits",
     registry=instrumentation.registry(),
 )
 
@@ -197,10 +209,13 @@ async def get(key: str, force: bool = False) -> Optional[str]:
         if not res:
             log.debug("cache miss", key=key)
             return None
+            CACHE_MISS.inc()
         log.debug("cache hit", key=key)
+        CACHE_HIT.inc()
         return res.decode("utf-8")
     except Exception as e:
         log.error("failed to get cache", key=key, exc_info=e)
+        CACHE_MISS.inc()
         return None
 
 
