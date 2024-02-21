@@ -1,3 +1,6 @@
+SHELL := /bin/bash
+
+GLAB_CMD   ?= glab
 IMAGE_NAME ?= annatar
 IMAGE_TAG  ?= latest
 BUILD_ARCH ?= linux/amd64
@@ -15,9 +18,8 @@ DOCKER_TAG_ARCH  := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 
 PYTEST_FLAGS ?= 
 
-CURRENT_GIT_TAG := $(shell git describe --tags --abbrev=0)
-RELEASE_VERSION := $(shell git describe --tags --abbrev=0 | awk -F. '{print $$1 "." $$2 "." $$3+1}')
-RELEASE_NOTES   := $(shell git log --graph --format='%h - %s' --abbrev-commit $(CURRENT_GIT_TAG)..HEAD)
+CURRENT_GIT_TAG  = $(shell git describe --tags --abbrev=0)
+RELEASE_VERSION ?= $(shell git describe --tags --abbrev=0 | awk -F. '{print $$1 "." $$2 "." $$3+1}')
 
 # Build and push container for BUILD_ARCH
 container:
@@ -45,8 +47,19 @@ test:
 confirm:
 	@echo -n "Proceed? [y/N] " && read ans && [ $${ans:-N} = y ]
 
-release:
-	@echo -e "Version: $(RELEASE_VERSION)\nRelease Notes:\n$(RELEASE_NOTES)\n"
+.INTERMEDIATE: RELEASE_NOTES.txt
+RELEASE_NOTES.txt:
+	git log --graph --format='%h - %s' \
+		--abbrev-commit $(CURRENT_GIT_TAG)..HEAD \
+		> $@
+
+release: RELEASE_NOTES.txt
+	@echo -e "Version: $(RELEASE_VERSION)\nRelease Notes:"
+	@cat $<
+	@echo 
 	@$(MAKE) --no-print-directory confirm
-	@glab release create -r master "$(RELEASE_VERSION)" --notes "$(RELEASE_NOTES)";
+	$(GLAB_CMD) release create $(RELEASE_VERSION) \
+		-r master \
+		--name "$(RELEASE_VERSION)" \
+		--notes-file $<
 

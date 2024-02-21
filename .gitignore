@@ -3,3 +3,4 @@ annatar.db*
 *.env
 .docker
 dist
+RELEASE_NOTES.txt
