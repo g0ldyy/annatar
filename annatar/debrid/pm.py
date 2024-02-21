@@ -8,7 +8,6 @@ from annatar.database import db
 from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
-from annatar.logging import timestamped
 from annatar.torrent import Torrent
 
 log = structlog.get_logger(__name__)
@@ -42,24 +41,23 @@ async def select_stream_file(
                 size=file.size,
                 url=file.link,
             )
-    log.info("no file found for season and episode", season_episode=season_episode)
+    log.debug("no file found for season and episode", season_episode=season_episode)
     return None
 
 
-@timestamped()
 async def get_stream_link(
     info_hash: str,
     debrid_token: str,
     season_episode: list[int],
 ) -> StreamLink | None:
-    log.info("searching for stream link", info_hash=info_hash, season_episode=season_episode)
+    log.debug("searching for stream link", info_hash=info_hash, season_episode=season_episode)
     dl: Optional[DirectDLResponse] = await api.directdl(
         info_hash=info_hash,
         api_token=debrid_token,
     )
 
     if not dl or not dl.content:
-        log.info("torrent has no cached content", info_hash=info_hash)
+        log.debug("torrent has no cached content", info_hash=info_hash)
         return None
 
     stream_link = await select_stream_file(dl.content, season_episode)

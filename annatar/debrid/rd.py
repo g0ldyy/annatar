@@ -16,7 +16,6 @@ from annatar.debrid.rd_models import (
     TorrentInfo,
     UnrestrictedLink,
 )
-from annatar.logging import timestamped
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"
 
@@ -52,7 +51,6 @@ async def find_streamable_file_id(
     return None
 
 
-@timestamped()
 async def get_torrent_link(
     torrent_id: str,
     file_id: int,
@@ -151,7 +149,6 @@ async def _get_stream_for_torrent(
     return unrestricted_link
 
 
-@timestamped()
 async def get_stream_for_torrent(
     info_hash: str,
     file_id: str,
@@ -185,7 +182,6 @@ async def get_stream_for_torrent(
     return sl
 
 
-@timestamped()
 async def get_stream_link(
     info_hash: str,
     debrid_token: str,

@@ -9,6 +9,8 @@ from typing import Any, Callable, TypeVar
 import __main__
 import structlog
 
+from annatar import config
+
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -31,7 +33,11 @@ structlog.configure(
         structlog.processors.EventRenamer(to="msg"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer(),
+        (
+            structlog.processors.JSONRenderer()
+            if config.ENV == "prod"
+            else structlog.dev.ConsoleRenderer(event_key="msg")
+        ),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -43,29 +49,3 @@ structlog.configure(
 def init():
     # the work is done on load
     return None
-
-
-# Define a generic return type
-R = TypeVar("R")
-
-
-def timestamped(log_args: list[str] = []):
-    def decorator(func: Callable[..., R]) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(func):
-
-            @wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> R:
-                result: R = await func(*args, **kwargs)
-                return result
-
-            return async_wrapper
-        else:
-
-            @wraps(func)
-            def wrapper(*args: Any, **kwargs: Any) -> R:
-                result: R = func(*args, **kwargs)
-                return result
-
-            return wrapper
-
-    return decorator

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Generic, Optional, Type, TypeVar
 
 import aiohttp
@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from annatar.database import db
 from annatar.debrid import magnet
 from annatar.debrid.pm_models import DirectDLResponse
-from annatar.logging import timestamped
+from annatar.instrumentation import HTTP_CLIENT_REQUEST_DURATION
 
 log = structlog.get_logger(__name__)
 
@@ -27,7 +27,6 @@ class HTTPResponse(Generic[T]):
         self.response = response
 
 
-@timestamped(["url", "method"])
 async def make_request(
     api_token: str,
     url: str,
@@ -37,19 +36,32 @@ async def make_request(
     headers: dict[str, str] = {},
     data: Optional[dict[str, str]] = None,
 ) -> HTTPResponse[T]:
-    full_url: str = f"{ROOT_URL}{url}"
-    async with aiohttp.ClientSession() as session:
-        params["apikey"] = api_token
-        async with session.request(
+    status_code: int = 0
+    start_time = datetime.now()
+    error = True
+    try:
+        async with aiohttp.ClientSession() as session:
+            params["apikey"] = api_token
+            async with session.request(
+                method=method,
+                url=f"{ROOT_URL}{url}",
+                params=params,
+                data=data,
+                headers=headers,
+            ) as response:
+                status_code = response.status if response.status else 0
+                raw: dict[str, Any] = await response.json()
+                model_instance = model.model_validate(raw)
+                error = False
+                return HTTPResponse(model=model_instance, response=response)
+    finally:
+        HTTP_CLIENT_REQUEST_DURATION.labels(
+            client="premiumize.me",
             method=method,
-            url=full_url,
-            params=params,
-            data=data,
-            headers=headers,
-        ) as response:
-            raw: dict[str, Any] = await response.json()
-            model_instance = model.model_validate(raw)
-            return HTTPResponse(model=model_instance, response=response)
+            url=url,
+            status_code=f"{status_code // 100}xx",
+            error=error,
+        ).observe(amount=(datetime.now() - start_time).total_seconds())
 
 
 async def directdl(

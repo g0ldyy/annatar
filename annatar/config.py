@@ -1,3 +1,4 @@
+import os
 from base64 import b64decode
 
 import structlog
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 log = structlog.get_logger()
 
 APP_ID = "community.annatar.addon"
+ENV = os.getenv("ENV", "dev")
 
 
 class UserConfig(BaseModel):

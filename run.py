@@ -36,5 +36,5 @@ if __name__ == "__main__":
         reload=False,
         workers=WORKERS,
         loop="uvloop",
-        log_level=LOG_LEVEL,
+        log_level="error",
     )
