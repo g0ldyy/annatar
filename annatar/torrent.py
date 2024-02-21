@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 # 1 bit:  2 values  (0 to 1) # good for boolean flags like HDR or Year
 # 2 bits: 4 values  (0 to 3)
 # 3 bits: 8 values  (0 to 7)
+# 4 bits: 16 values  (0 to 15)
 # I'm not using any more than this. 8 is far too wide a decision tree
 
 SEASON_MATCH_BIT_POS = 20
@@ -16,22 +17,37 @@ RESOLUTION_BIT_POS = 14
 AUDIO_BIT_POS = 8
 YEAR_MATCH_BIT_POS = 6
 
-RESOLUTION_SCORES = {"720p": 1, "1080p": 2, "2160p": 3, "4K": 3}
-RESOLUTION_BITS_LENGTH = 2
+RESOLUTION_SCORES = {
+    "720p": 1,
+    "1080p": 2,
+    # QHD
+    "1440p": 3,
+    # 4K
+    "2160p": 4,
+    "4K": 4,
+    # 5K
+    "2880p": 5,
+    "5K": 5,
+    # 8K
+    "4320p": 6,
+    "8K": 6,
+}
+RESOLUTION_BITS_LENGTH = 3
 
 
 def score_resolution(resolution: str) -> int:
+    """
+    Gives the resolution a score between 0 and (RESOLUTION_BITS_LENGTH^2)-1
+    Higher number is better
+    """
     if resolution in RESOLUTION_SCORES:
         return RESOLUTION_SCORES[resolution]
     return 0
 
 
 def get_resolution(score: int) -> str:
-    # Create a mask to isolate resolution bits
     mask = ((1 << RESOLUTION_BITS_LENGTH) - 1) << RESOLUTION_BIT_POS
-    # Apply mask and shift
     resolution_value = (score & mask) >> RESOLUTION_BIT_POS
-    # Map the value back to resolution
     for resolution, value in RESOLUTION_SCORES.items():
         if value == resolution_value:
             return resolution
@@ -88,11 +104,13 @@ class Torrent(BaseModel):
     def score_series(self, season: int, episode: int) -> int:
         """
         Score a torrent based on season and episode where the rank is as follows:
-        3 -> Whole series matches (len(self.season) > 0 and season in self.season and not self episode)
-        2 -> Whole season matches (len(self.season) == 1 and season in self.season and not self.episode or episode in self.episode)
-        1 -> Single episode matches (season in self.season and episode in self.episode)
-        0 -> No match at all (not self.season and not self.episode)
-        -1 -> Mismatch Season or episode ((self.season and season not in self.season) or (self.episode and episode not in self.episode))
+           3 -> Whole series matches
+           2 -> Whole season matches
+           1 -> Single episode matches
+           0 -> No match at all
+        -100 -> Mismatch Season
+         -10 -> Mismatch Episode
+          -1 -> Unknown mismatch
         """
         if not season and not episode:
             # no season or episode. Probably a movie
