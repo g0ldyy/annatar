@@ -41,7 +41,7 @@ class RealDebridProvider(DebridService):
     async def get_stream_for_torrent(
         self,
         info_hash: str,
-        file_id: str,
+        file_id: int,
         debrid_token: str,
     ) -> Optional[StreamLink]:
         return await rd.get_stream_for_torrent(

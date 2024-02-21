@@ -74,14 +74,14 @@ async def get_hashes(
 
 
 @router.get(
-    "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:str}",
+    "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:int}",
     response_model=StreamResponse,
     response_model_exclude_none=True,
 )
 async def get_rd_stream(
     debrid_api_key: Annotated[str, Path(description="Debrid token")],
     info_hash: Annotated[str, Path(description="Torrent info hash")],
-    file_id: Annotated[str, Path(description="ID of the file in the torrent")],
+    file_id: Annotated[int, Path(description="ID of the file in the torrent")],
 ) -> RedirectResponse:
     rd: RealDebridProvider = RealDebridProvider(debrid_api_key)
     stream: Optional[StreamLink] = await rd.get_stream_for_torrent(

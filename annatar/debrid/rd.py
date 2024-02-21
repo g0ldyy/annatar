@@ -95,7 +95,7 @@ async def get_torrent_link(
 
 async def _get_stream_for_torrent(
     info_hash: str,
-    file_id: str,
+    file_id: int,
     debrid_token: str,
 ) -> Optional[UnrestrictedLink]:
 
@@ -157,7 +157,7 @@ async def _get_stream_for_torrent(
 
 async def get_stream_for_torrent(
     info_hash: str,
-    file_id: str,
+    file_id: int,
     debrid_token: str,
 ) -> Optional[StreamLink]:
     """
