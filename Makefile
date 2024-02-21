@@ -49,11 +49,13 @@ confirm:
 
 .INTERMEDIATE: RELEASE_NOTES.txt
 RELEASE_NOTES.txt:
-	git log --graph --format='%h - %s' \
+	git fetch --tags
+	@git log --graph --format='%h - %s' \
 		--abbrev-commit $(CURRENT_GIT_TAG)..HEAD \
 		> $@
 
 release: RELEASE_NOTES.txt
+	@echo
 	@echo -e "Version: $(RELEASE_VERSION)\nRelease Notes:"
 	@cat $<
 	@echo 
