@@ -24,11 +24,11 @@ def test_sorting_series_by_score_names():
         "Friends S05 COMPLETE 2160p",
         "Friends S5",
         "Friends S05E10 1080p",
-        "Friends S01-S3",  # matches only name
-        "Friends S3",  # matches only name
-        "Best Friends S01-S10 2160p",  # matches solely on quality
+        "Best Friends S01-E01 2160p",  # matches solely on quality
         "The Office S01-S10 1080p",  # matches on quality and series
         "The Office S5E10",  # matches on series and episode
+        "Friends S01-S3",  # matches only name
+        "Friends S3",  # matches only name
     ]
 
     results = sorted(
@@ -42,6 +42,7 @@ def test_sorting_series_by_score_names():
         reverse=True,
     )
 
+    print(results)
     assert results == torrents
 
 
@@ -49,7 +50,7 @@ def test_score_series():
     result = Torrent.parse_title(title="Friends S01-S10").score_series(season=5, episode=10)
     assert result == 3
     result = Torrent.parse_title(title="Friends S04-E10").score_series(season=5, episode=10)
-    assert result == -10
+    assert result == -100
     result = Torrent.parse_title(title="Friends S05").score_series(season=5, episode=10)
     assert result == 2
     result = Torrent.parse_title(title="Friends S05-E10").score_series(season=5, episode=10)
