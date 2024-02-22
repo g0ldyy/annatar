@@ -3,14 +3,15 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class InstantFileSet(BaseModel):
+    info_hash: str
+    file_ids: list[int]
+
+
 class InstantFile(BaseModel):
     id: int
     filename: str
     filesize: int
-
-
-class InstantFileSet(BaseModel):
-    files: list[InstantFile]
 
 
 class StreamableFile(BaseModel):

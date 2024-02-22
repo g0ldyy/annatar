@@ -99,9 +99,8 @@ async def _get_stream_for_torrent(
     debrid_token: str,
 ) -> Optional[UnrestrictedLink]:
 
-    cache_key: str = f"rd:instantAvailable:{info_hash.upper()}"
     file_set: InstantFileSet | None = await db.get_model(
-        key=cache_key,
+        key=f"rd:instant_file_set:torrent:{info_hash.upper()}",
         model=InstantFileSet,
     )
 
@@ -110,7 +109,7 @@ async def _get_stream_for_torrent(
         return None
 
     torrent_id: Optional[str] = await api.add_magnet(
-        info_hash=info_hash,
+        info_hash=file_set.info_hash,
         debrid_token=debrid_token,
     )
 
@@ -124,7 +123,7 @@ async def _get_stream_for_torrent(
     selected: bool = await api.select_torrent_files(
         torrent_id=torrent_id,
         debrid_token=debrid_token,
-        file_ids=[f.id for f in file_set.files],
+        file_ids=file_set.file_ids,
     )
     if selected:
         log.info("Selected torrent file set", torrent_id=torrent_id, file_id=file_id)
@@ -134,7 +133,7 @@ async def _get_stream_for_torrent(
     torrent_link: str | None = await get_torrent_link(
         torrent_id=torrent_id,
         file_id=file_id,
-        info_hash=info_hash,
+        info_hash=file_set.info_hash,
         debrid_token=debrid_token,
     )
     if not torrent_link:
@@ -230,6 +229,12 @@ async def get_stream_link(
         log.debug("found matching instantAvailable set")
         # this route has to match the route provided to provide the 302
         url: str = f"/rd/{debrid_token}/{info_hash}/{file_id}"
+
+        await db.set_model(
+            key=f"rd:instant_file_set:torrent:{info_hash.upper()}",
+            model=InstantFileSet(info_hash=info_hash, file_ids=[f.id for f in cached_files]),
+            ttl=timedelta(hours=8),
+        )
 
         return StreamLink(
             size=file.filesize,
