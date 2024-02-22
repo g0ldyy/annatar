@@ -4,7 +4,6 @@ from typing import AsyncGenerator, Optional
 import structlog
 
 from annatar import human
-from annatar.database import db
 from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
@@ -77,7 +76,6 @@ async def get_stream_links(
     """
     Generates a list of stream links for each torrent link.
     """
-    links: dict[str, bool] = {}
     concurrency = max_results * 3
     grouped = [torrents[i : i + concurrency] for i in range(0, len(torrents), concurrency)]
 

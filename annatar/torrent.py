@@ -2,8 +2,7 @@ import re
 from typing import Any
 
 import PTN
-import structlog
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 # Space required for values
 # 1 bit:  2 values  (0 to 1) # good for boolean flags like HDR or Year
@@ -76,7 +75,7 @@ class Torrent(BaseModel):
     @field_validator("season", "episode", "language", "subtitles", mode="before")
     @classmethod
     def ensure_is_list(cls: Any, v: Any):
-        if v == None:
+        if v is None:
             return []
         if isinstance(v, int):
             return [v]

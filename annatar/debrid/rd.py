@@ -248,7 +248,6 @@ async def get_stream_links(
     """
     Generates a list of RD links for each torrent link.
     """
-    links: dict[str, bool] = {}
     concurrency = max_results * 3
     grouped = [torrents[i : i + concurrency] for i in range(0, len(torrents), concurrency)]
 

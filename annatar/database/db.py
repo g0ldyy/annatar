@@ -3,7 +3,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import timedelta
-from typing import AsyncGenerator, Callable, Coroutine, Optional, Tuple, Type, TypeVar
+from typing import Callable, Coroutine, Optional, Type, TypeVar
 
 import structlog
 from prometheus_client import Counter, Histogram
