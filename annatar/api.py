@@ -2,7 +2,6 @@ import asyncio
 import math
 import re
 from collections import defaultdict
-from datetime import datetime
 from itertools import chain
 from typing import Optional
 
@@ -149,7 +148,7 @@ def arrange_into_rows(strings: list[str], rows: int) -> str:
 REQUEST_DURATION = Histogram(
     name="api_request_duration_seconds",
     documentation="Duration of API requests in seconds",
-    labelnames=["type", "debrid_service", "cached", "error"],
+    labelnames=["type", "debrid_service"],
     registry=instrumentation.registry(),
 )
 
@@ -188,33 +187,22 @@ async def search(
     season_episode: list[int] = [],
     indexers: list[str] = [],
 ) -> StreamResponse:
-    start_time = datetime.now()
     res: Optional[StreamResponse] = None
-    try:
-        res = await _search(
-            type=type,
-            max_results=max_results,
-            debrid=debrid,
-            imdb_id=imdb_id,
-            season_episode=season_episode,
-            indexers=indexers,
-        )
-        return res
-    except Exception as e:
-        log.error("error searching", type=type, id=imdb_id, exc_info=e)
-        res = StreamResponse(streams=[], error="Error searching")
-        return res
-    finally:
-        secs = (datetime.now() - start_time).total_seconds()
-        REQUEST_DURATION.labels(
-            type=type,
-            debrid_service=debrid.id(),
-            cached=res.cached if res else False,
-            error=True if res and res.error else False,
-        ).observe(
-            secs,
-            exemplar={
-                "imdb": imdb_id,
-                "season_episode": ",".join([str(i) for i in season_episode]),
-            },
-        )
+    with REQUEST_DURATION.labels(
+        type=type,
+        debrid_service=debrid.id(),
+    ).time():
+        try:
+            res = await _search(
+                type=type,
+                max_results=max_results,
+                debrid=debrid,
+                imdb_id=imdb_id,
+                season_episode=season_episode,
+                indexers=indexers,
+            )
+            return res
+        except Exception as e:
+            log.error("error searching", type=type, id=imdb_id, exc_info=e)
+            res = StreamResponse(streams=[], error="Error searching")
+            return res
