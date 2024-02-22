@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 
 class InstantFileSet(BaseModel):
-    info_hash: str
     file_ids: list[int]
 
 

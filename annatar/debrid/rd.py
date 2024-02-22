@@ -98,9 +98,8 @@ async def _get_stream_for_torrent(
     file_id: int,
     debrid_token: str,
 ) -> Optional[UnrestrictedLink]:
-
     file_set: InstantFileSet | None = await db.get_model(
-        key=f"rd:instant_file_set:torrent:{info_hash.upper()}",
+        key=f"rd:instant_file_set:torrent:{info_hash.upper()}:{file_id}",
         model=InstantFileSet,
     )
 
@@ -109,7 +108,7 @@ async def _get_stream_for_torrent(
         return None
 
     torrent_id: Optional[str] = await api.add_magnet(
-        info_hash=file_set.info_hash,
+        info_hash=info_hash,
         debrid_token=debrid_token,
     )
 
@@ -133,7 +132,7 @@ async def _get_stream_for_torrent(
     torrent_link: str | None = await get_torrent_link(
         torrent_id=torrent_id,
         file_id=file_id,
-        info_hash=file_set.info_hash,
+        info_hash=info_hash,
         debrid_token=debrid_token,
     )
     if not torrent_link:
@@ -231,8 +230,8 @@ async def get_stream_link(
         url: str = f"/rd/{debrid_token}/{info_hash}/{file_id}"
 
         await db.set_model(
-            key=f"rd:instant_file_set:torrent:{info_hash.upper()}",
-            model=InstantFileSet(info_hash=info_hash, file_ids=[f.id for f in cached_files]),
+            key=f"rd:instant_file_set:torrent:{info_hash.upper()}:{file_id}",
+            model=InstantFileSet(file_ids=[f.id for f in cached_files]),
             ttl=timedelta(hours=8),
         )
 
