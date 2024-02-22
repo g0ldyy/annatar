@@ -1,23 +1,20 @@
 import asyncio
 import os
 import re
-from collections import defaultdict
 from datetime import datetime, timedelta
-from itertools import chain
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 import aiohttp
 import structlog
 from prometheus_client import Histogram
 from structlog.contextvars import bound_contextvars
 
-from annatar import human, instrumentation
+from annatar import instrumentation
 from annatar.database import db
 from annatar.debrid import magnet
 from annatar.jackett_models import (
     MOVIES,
     SERIES,
-    Indexer,
     ScoredTorrent,
     SearchQuery,
     SearchResult,
@@ -36,6 +33,11 @@ JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 6))
 SEARCH_TTL = timedelta(weeks=1)
 JACKETT_CACHE_MINUTES = timedelta(minutes=int(os.environ.get("JACKETT_CACHE_MINUTES", 15)))
 
+JACKETT_INDEXERS_LIST: list[str] = os.environ.get(
+    "JACKETT_INDEXERS",
+    "yts,eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,bitsearch,limetorrents,badasstorrents",
+).split(",")
+
 
 REQUEST_DURATION = Histogram(
     name="jackett_request_duration_seconds",
@@ -45,8 +47,8 @@ REQUEST_DURATION = Histogram(
 )
 
 
-async def get_indexers() -> list[Indexer]:
-    return Indexer.all()
+async def get_indexers() -> list[str]:
+    return JACKETT_INDEXERS_LIST
 
 
 async def search_indexer(
@@ -76,7 +78,6 @@ async def search_indexer(
     )
 
     log.debug("searching indexer", indexer=indexer, query=search_query.imdb_id)
-    torrents: list[str] = []
     try:
         raw_results: list[SearchResult] = await execute_search(
             indexer=indexer,
@@ -126,7 +127,7 @@ async def search_indexer(
 
 async def search_indexers(
     search_query: SearchQuery,
-    indexers: list[Indexer],
+    indexers: list[str],
 ) -> list[str]:
     log.info("searching indexers", indexers=indexers)
 
@@ -159,11 +160,11 @@ async def search_indexers(
         asyncio.create_task(
             search_indexer(
                 search_query=search_query,
-                indexer=indexer.id,
+                indexer=indexer,
                 queue=queue,
                 stop=stop,
             ),
-            name=f"search_indexer:{indexer.id}",
+            name=f"search_indexer:{indexer}",
         )
         for indexer in indexers
     ]

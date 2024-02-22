@@ -2,8 +2,7 @@ import asyncio
 import math
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
-from hashlib import md5
+from datetime import datetime
 from itertools import chain
 from typing import Optional
 
@@ -14,7 +13,7 @@ from annatar import human, instrumentation, jackett
 from annatar.database import db
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
-from annatar.jackett_models import Indexer, SearchQuery
+from annatar.jackett_models import SearchQuery
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
 from annatar.torrent import Torrent
@@ -57,10 +56,9 @@ async def _search(
         q.season = str(season_episode[0])
         q.episode = str(season_episode[1])
 
-    found_indexers: list[Indexer | None] = [Indexer.find_by_id(i) for i in indexers]
     torrents = await jackett.search_indexers(
         search_query=q,
-        indexers=[i for i in found_indexers if i and i.supports(type)],
+        indexers=indexers,
     )
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
