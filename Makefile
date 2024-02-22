@@ -36,11 +36,9 @@ docker-manifest:
 	docker manifest push $(DOCKER_TAG)
 
 test:
-	poetry run ruff format --check --diff annatar
-	poetry run ruff check annatar
+	poetry run pyright annatar
 	poetry run isort --check --diff annatar run.py
 	poetry run black --check --diff annatar run.py
-	poetry run pyright annatar
 	poetry run pytest $(PYTEST_FLAGS)
 
 .PHONY: confirm

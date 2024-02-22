@@ -98,6 +98,7 @@ async def _get_stream_for_torrent(
     file_id: int,
     debrid_token: str,
 ) -> Optional[UnrestrictedLink]:
+
     cache_key: str = f"rd:instantAvailable:{info_hash.upper()}"
     file_set: InstantFileSet | None = await db.get_model(
         key=cache_key,

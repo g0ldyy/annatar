@@ -25,7 +25,6 @@ pyright = "^1.1.348"
 pytest = "^8.0.0"
 pytest-watch = "^4.2.0"
 types-redis = "^4.6.0.20240106"
-ruff = "^0.2.2"
 
 [build-system]
 requires = ["poetry-core"]
@@ -47,22 +46,3 @@ reportUnusedImport = true
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
-
-[tool.ruff]
-# Exclude a variety of commonly ignored directories.
-line-length = 100
-exclude = [
-    ".direnv",
-    ".git",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "build",
-    "dist",
-    "typings",
-    "venv",
-]
