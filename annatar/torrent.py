@@ -1,4 +1,5 @@
 import re
+from enum import Enum
 from typing import Any
 
 import PTN
@@ -53,9 +54,14 @@ def get_resolution(score: int) -> str:
     return "Unknown"
 
 
-class Torrent(BaseModel):
+class Category(str, Enum):
+    Movie = "movie"
+    Series = "series"
+
+
+class TorrentMeta(BaseModel):
     title: str
-    info_hash: str = ""
+    imdb: str | None = None
     episode: list[int] = []
     episodeName: str = ""
     season: list[int] = []
@@ -83,11 +89,27 @@ class Torrent(BaseModel):
             return [v]
         return v
 
+    @field_validator("imdb", mode="before")
+    @classmethod
+    def fix_imdb_id(cls: Any, v: Any):
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return f"tt{v:07d}"
+        if isinstance(v, str):
+            if v.startswith("tt"):
+                return v
+            return f"tt{int(v):07d}"
+        return v
+
+    def with_info_hash(self, info_hash: str) -> "Torrent":
+        return Torrent(**self.model_dump(), info_hash=info_hash)
+
     @staticmethod
-    def parse_title(title: str) -> "Torrent":
+    def parse_title(title: str) -> "TorrentMeta":
         meta: dict[Any, Any] = PTN.parse(title, standardise=True)
         meta["raw_title"] = title
-        return Torrent(**meta)
+        return TorrentMeta(**meta)
 
     @property
     def audio_channels(self) -> str:
@@ -138,8 +160,23 @@ class Torrent(BaseModel):
         sanitized_name: str = re.sub(r"\W+", r"\\W+", title)
         return bool(re.search(rf"^{sanitized_name}$", self.title, re.IGNORECASE))
 
-    def score_with(self, title: str, year: int, season: int = 0, episode: int = 0) -> int:
-        if not self.matches_name(title):
+    @property
+    def score(self):
+        return self.match_score(
+            title=self.title,
+            year=self.year,
+            season=self.season[0] if self.season else 0,
+            episode=self.episode[0] if self.episode else 0,
+        )
+
+    def match_score(
+        self,
+        year: int,
+        title: str | None = None,
+        season: int = 0,
+        episode: int = 0,
+    ) -> int:
+        if title and not self.matches_name(title):
             return -1000
 
         season_match_score = (
@@ -159,16 +196,34 @@ class Torrent(BaseModel):
         return result
 
 
+class Torrent(TorrentMeta, BaseModel):
+    info_hash: str
+
+    @field_validator("info_hash", mode="before")
+    @classmethod
+    def consistent_info_hash(cls: Any, v: Any):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            # info_hash needs to be upper case for comparison
+            return v.upper()
+        return v
+
+
+class TorrentList(BaseModel):
+    torrents: list[str]
+
+
 def max_score_for(resolution: str) -> int:
     return Torrent.parse_title(
         title=f"Friends S01-S10 1994 7.1 COMPLETE {resolution}",
-    ).score_with(title="Friends", year=1994, season=5, episode=10)
+    ).match_score(title="Friends", year=1994, season=5, episode=10)
 
 
 def lowest_score_for(resolution: str) -> int:
     return Torrent.parse_title(
         title=f"Oppenheimer {resolution}",
-    ).score_with(title="Oppenheimer", year=2022, season=1, episode=1)
+    ).match_score(title="Oppenheimer", year=2022, season=1, episode=1)
 
 
 def score_range_for(resolution: str) -> range:

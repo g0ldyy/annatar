@@ -1,5 +1,4 @@
 import os
-from contextvars import ContextVar
 
 import structlog
 from fastapi import FastAPI, Request
@@ -15,12 +14,11 @@ from prometheus_client import (
 
 log = structlog.get_logger()
 
-NO_CACHE = ContextVar("NO_CACHE", default=False)
-
 
 def registry() -> CollectorRegistry:
     reg = CollectorRegistry()
-    multiprocess.MultiProcessCollector(reg)
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR", None):
+        multiprocess.MultiProcessCollector(reg)
     return reg
 
 

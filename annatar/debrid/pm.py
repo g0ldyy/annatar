@@ -7,7 +7,7 @@ from annatar import human
 from annatar.debrid import premiumize_api as api
 from annatar.debrid.models import StreamLink
 from annatar.debrid.pm_models import DirectDL, DirectDLResponse
-from annatar.torrent import Torrent
+from annatar.torrent import TorrentMeta
 
 log = structlog.get_logger(__name__)
 
@@ -32,7 +32,7 @@ async def select_stream_file(
             continue
 
         path = file.path.split("/")[-1].lower()
-        meta: Torrent = Torrent.parse_title(path)
+        meta: TorrentMeta = TorrentMeta.parse_title(path)
         if meta.is_season_episode(season=season, episode=episode):
             log.debug("path matches season and episode", path=path, season_episode=season_episode)
             return StreamLink(

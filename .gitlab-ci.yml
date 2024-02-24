@@ -15,6 +15,15 @@ services:
     alias: docker
     entrypoint: ["dockerd-entrypoint.sh", "--tls=false"]
 
+lint:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - apt-get update && apt-get install make
+    - pip install poetry
+    - poetry install
+    - make lint
+
 test:
   stage: test
   image: python:3.11-slim
@@ -28,6 +37,23 @@ test:
     - pip install poetry
     - poetry install
     - make test
+
+coverage:
+  only: [merge_requests]
+  stage: test
+  image: python:3.11-slim
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  script:
+    - apt-get update && apt-get install make
+    - pip install poetry
+    - poetry install
+    - poetry run pytest --cov --cov-report term --cov-report xml:coverage.xml
+
 
 amd64_build:
   stage: docker_build

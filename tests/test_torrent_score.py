@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 
 from annatar.torrent import Torrent
@@ -32,7 +31,7 @@ def test_sorting_series_by_score_names():
 
     results = sorted(
         torrents,
-        key=lambda t: Torrent.parse_title(title=t).score_with(
+        key=lambda t: Torrent.parse_title(title=t).match_score(
             title=search_query.name,
             year=search_query.year,
             season=search_query.season,

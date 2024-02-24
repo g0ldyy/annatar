@@ -34,16 +34,6 @@ def get_route_handler(request: Request) -> str | None:
     return None
 
 
-class CacheBust(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
-        if request.headers.get("x-cache-bust") == CACHE_BUST_KEY:
-            instrumentation.NO_CACHE.set(True)
-        else:
-            instrumentation.NO_CACHE.set(False)
-        resp: Response = await call_next(request)
-        return resp
-
-
 class Metrics(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         start_time = datetime.now()
