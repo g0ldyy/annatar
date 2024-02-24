@@ -19,13 +19,13 @@ class Keys:
     def torrent(info_hash: str) -> str:
         if not info_hash:
             raise ValueError("info_hash is required")
-        return f"torrent:{info_hash.upper()}"
+        return f"torrent:v1:meta:{info_hash.upper()}"
 
     @staticmethod
     def torrents(imdb: str, season: int | None = None, episode: int | None = None) -> str:
         if not imdb:
             raise ValueError("imdb is required")
-        cache_key: str = f"torrents:{imdb}"
+        cache_key: str = f"torrents:v1:{imdb}"
         if season and episode:
             cache_key = f"{cache_key}:{season}:{episode}"
         elif season:
