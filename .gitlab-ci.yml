@@ -7,23 +7,6 @@ stages:
   docker_login: >-
     docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
-.default_rules:
-  rules:
-    # allow manual builds
-    - when: manual
-    # never run on schedules
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: never
-    # run always on master branch
-    - if: '$CI_COMMIT_BRANCH = "master"'
-      when: always
-    # only run for non-empty branches
-    - if: $CI_COMMIT_BRANCH
-      changes:
-        compare_to: 'refs/heads/master'
-        paths:
-          - '*'
-
 variables:
   DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
   DOCKER_DRIVER: overlay2
@@ -38,7 +21,6 @@ services:
 
 lint:
   stage: test
-  rules: !reference [.default_rules, rules]
   image: python:3.11-slim
   script:
     - apt-get update && apt-get install make
@@ -48,7 +30,6 @@ lint:
 
 test:
   stage: test
-  rules: !reference [.default_rules, rules]
   image: python:3.11-slim
   artifacts:
     reports:
