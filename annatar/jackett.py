@@ -211,10 +211,9 @@ async def offload_searches(
 
 
 class JackettSearchError(Exception):
-    def __init__(self, message: str, status: int | None, cause: Exception | None):
+    def __init__(self, message: str, status: int | None):
         self.message = message
         self.status = status
-        self.cause = cause
 
 
 async def execute_search(
@@ -264,15 +263,13 @@ async def execute_search(
                     raise JackettSearchError(
                         message="jackett search timeout",
                         status=response_status,
-                        cause=e,
-                    )
+                    ) from e
                 except Exception as err:
                     log.error("jacket search error", exc_info=err)
                     raise JackettSearchError(
                         message="jackett search error",
                         status=response_status,
-                        cause=err,
-                    )
+                    ) from err
 
         res: SearchResults = SearchResults(
             Results=[SearchResult(**result) for result in response_json["Results"]]

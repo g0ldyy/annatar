@@ -31,9 +31,13 @@ async def _search(
     max_results: int,
     debrid: DebridService,
     imdb_id: str,
-    season_episode: list[int] = [],
-    indexers: list[str] = [],
+    season_episode: None | list[int] = None,
+    indexers: None | list[str] = None,
 ) -> StreamResponse:
+    if indexers is None:
+        indexers = []
+    if season_episode is None:
+        season_episode = []
     if await db.unique_add("stream_request", f"{imdb_id}:{season_episode}"):
         log.debug("unique search")
         UNIQUE_SEARCHES.inc()
@@ -186,9 +190,13 @@ async def search(
     max_results: int,
     debrid: DebridService,
     imdb_id: str,
-    season_episode: list[int] = [],
-    indexers: list[str] = [],
+    season_episode: None | list[int] = None,
+    indexers: None | list[str] = None,
 ) -> StreamResponse:
+    if indexers is None:
+        indexers = []
+    if season_episode is None:
+        season_episode = []
     res: Optional[StreamResponse] = None
     with REQUEST_DURATION.labels(
         type=type,

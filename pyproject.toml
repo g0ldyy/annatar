@@ -50,6 +50,12 @@ line-length = 100
 exclude = [ ".direnv", ".git", ".pyenv", ".pytest_cache", ".pytype", ".ruff_cache", ".vscode", "__pypackages__", "_build", "build", "dist", "typings", "venv"]
 
 [tool.ruff.lint]
+ignore = [
+  # "PLR0911", # flake8-bugbear: Found commented out code
+  "PLR0913", # flask8-bugbear: Too many arguments for a method or function
+  "PLR0911", # flask8-bugbear: Too many return statements
+  "PLR2004", # flake8-bugbear: Magic value used in comparison
+]
 extend-select = [
   "I",   # isort
   "C90", # mccabe complexity

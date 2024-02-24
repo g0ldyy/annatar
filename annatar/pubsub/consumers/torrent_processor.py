@@ -14,8 +14,8 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
-MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", 30))
-TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", 100))
+MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
+TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "100"))
 
 
 class TorrentProcessor:
@@ -82,7 +82,6 @@ async def process_movie(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: 
             score=score,
             ttl=ttl,
         )
-    return
 
 
 async def process_show(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: timedelta):

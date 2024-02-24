@@ -18,9 +18,13 @@ async def make_request(
     method: str,
     debrid_token: str,
     url: str,
-    url_values: dict[str, str] = {},
-    body: dict[str, Any] = {},
+    url_values: dict[str, str] = None,
+    body: dict[str, Any] = None,
 ) -> Any:
+    if body is None:
+        body = {}
+    if url_values is None:
+        url_values = {}
     api_url = f"{ROOT_URL}{url.format(**url_values)}"
     start_time = datetime.now()
     status_code: str = "2xx"
@@ -122,8 +126,10 @@ async def select_torrent_files(
     torrent_id: str,
     file_ids: list[int],
     debrid_token: str,
-    season_episode: list[int] = [],
+    season_episode: list[int] = None,
 ) -> bool:
+    if season_episode is None:
+        season_episode = []
     await make_request(
         method="POST",
         url="/torrents/selectFiles/{torrent_id}",

@@ -35,7 +35,7 @@ def parse_config(b64config: str) -> UserConfig:
         log.warning("error decoding config", exc_info=e, errro_type=type(e).__name__)
         raise RequestValidationError(
             errors=e.errors(include_url=False, include_input=False),
-        )
+        ) from e
     except Exception as e:
         log.error("Unrecognized error", exc_info=e)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e

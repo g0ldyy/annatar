@@ -25,7 +25,7 @@ log = structlog.get_logger(__name__)
 
 async def find_streamable_file_id(
     files: list[TorrentFile],
-    season_episode: list[int],
+    season_episode: None | list[int] = None,
 ) -> int | None:
     if len(files) == 0:
         log.debug("No files, returning 0")
@@ -190,7 +190,7 @@ async def get_stream_for_torrent(
 async def get_stream_link(
     info_hash: str,
     debrid_token: str,
-    season_episode: list[int] = [],
+    season_episode: None | list[int] = None,
 ) -> StreamLink | None:
     async for cached_files in api.get_instant_availability(
         info_hash,
@@ -247,7 +247,7 @@ async def get_stream_links(
     debrid_token: str,
     stop: asyncio.Event,
     max_results: int,
-    season_episode: list[int] = [],
+    season_episode: None | list[int] = None,
 ) -> AsyncGenerator[StreamLink, None]:
     """
     Generates a list of RD links for each torrent link.

@@ -32,10 +32,14 @@ async def make_request(
     url: str,
     method: str,
     model: Type[T],
-    params: dict[str, str] = {},
-    headers: dict[str, str] = {},
+    params: None | dict[str, str] = None,
+    headers: None | dict[str, str] = None,
     data: Optional[dict[str, str]] = None,
 ) -> HTTPResponse[T]:
+    if headers is None:
+        headers = {}
+    if params is None:
+        params = {}
     status_code: int = 0
     start_time = datetime.now()
     error = True

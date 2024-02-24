@@ -21,7 +21,7 @@ log = structlog.get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("starting torrent processors")
-    concurrency = int(os.getenv("TORRENT_PROCESSING_CONCURRENCY", 2))
+    concurrency = int(os.getenv("TORRENT_PROCESSING_CONCURRENCY", "2"))
     worker_tasks = [
         asyncio.create_task(TorrentProcessor.run(), name=f"torrent_processor_{i}")
         for i in range(concurrency)

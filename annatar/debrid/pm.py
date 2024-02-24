@@ -71,11 +71,13 @@ async def get_stream_links(
     debrid_token: str,
     stop: asyncio.Event,
     max_results: int,
-    season_episode: list[int] = [],
+    season_episode: None | list[int] = None,
 ) -> AsyncGenerator[StreamLink, None]:
     """
     Generates a list of stream links for each torrent link.
     """
+    if season_episode is None:
+        season_episode = []
     concurrency = max_results * 3
     grouped = [torrents[i : i + concurrency] for i in range(0, len(torrents), concurrency)]
 

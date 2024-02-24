@@ -56,4 +56,3 @@ def init():
 def shutdown(app: FastAPI):
     log.info("shutdown prometheus multiprocess_mode")
     multiprocess.mark_process_dead(os.getpid())  # type: ignore
-    return
