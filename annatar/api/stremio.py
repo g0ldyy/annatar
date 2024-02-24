@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
-from annatar import api
+from annatar.api.core import api
 from annatar.config import UserConfig, parse_config
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider

@@ -8,7 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from annatar import instrumentation, logging, middleware, routes, web
+from annatar import instrumentation, logging, middleware, web
+from annatar.api import stremio
 from annatar.pubsub.consumers.torrent_processor import TorrentProcessor
 
 logging.init()
@@ -66,5 +67,5 @@ async def add_CORS_header(request: Request, call_next: Any):
     return response
 
 
-app.include_router(routes.router)
+app.include_router(stremio.router)
 app.include_router(web.router)
