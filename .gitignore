@@ -4,3 +4,4 @@ annatar.db*
 .docker
 dist
 RELEASE_NOTES.txt
+.coverage

@@ -1,9 +1,8 @@
-import asyncio
 import os
 import sys
 from collections import defaultdict
 from datetime import timedelta
-from typing import Callable, Coroutine, Optional, Type, TypeVar
+from typing import Any, Callable, Coroutine, Optional, Type, TypeVar
 
 import structlog
 from prometheus_client import Counter, Histogram
@@ -81,7 +80,6 @@ async def unique_list_add(
 ) -> bool:
     added: int = redis.zadd(name, {item: score})
     if ttl.total_seconds() > 0:
-        log.debug("setting ttl for unique list", name=name, ttl=ttl)
         await set_ttl(name, ttl)
     return bool(added)
 
@@ -215,21 +213,72 @@ async def set(key: str, value: str, ttl: timedelta | None = None) -> bool:
         return False
 
 
+@REQUEST_DURATION.labels("HSET").time()
+async def hset(key: str, field: str, value: str) -> bool:
+    return await measure_hits(key, lambda: _hset(key, field, value))
+
+
+async def _hset(key: str, field: str, value: str) -> bool:
+    try:
+        return bool(redis.hset(key, field, value))
+    except Exception as e:
+        log.error("failed to hset cache", key=key, exc_info=e)
+        return False
+
+
+@REQUEST_DURATION.labels("HMSET").time()
+async def hmset(key: str, mapping: dict[Any, Any]) -> bool:
+    return await measure_hits(key, lambda: _hmset(key, mapping))
+
+
+async def _hmset(key: str, mapping: dict[Any, Any]) -> bool:
+    try:
+        return bool(redis.hmset(key, mapping))
+    except Exception as e:
+        log.error("failed to hmset cache", key=key, exc_info=e)
+        return False
+
+
+@REQUEST_DURATION.labels("HGET").time()
+async def hget(key: str, field: str) -> Optional[str]:
+    return await measure_hits(key, lambda: _hget(key, field))
+
+
+async def _hget(key: str, field: str) -> Optional[str]:
+    try:
+        if res := redis.hget(key, field):
+            return res.decode("utf-8")
+        return None
+    except Exception as e:
+        log.error("failed to hget cache", key=key, exc_info=e)
+        return None
+
+
+@REQUEST_DURATION.labels("HGETALL").time()
+async def hgetall(key: str) -> dict[str, str]:
+    return await measure_hits(key, lambda: _hgetall(key))
+
+
+async def _hgetall(key: str) -> dict[str, str]:
+    try:
+        return {k.decode("utf-8"): v.decode("utf-8") for k, v in redis.hgetall(key).items()}
+    except Exception as e:
+        log.error("failed to hgetall cache", key=key, exc_info=e)
+        return {}
+
+
 @REQUEST_DURATION.labels("TTL").time()
 async def ttl(key: str) -> int:
     return redis.ttl(key)
 
 
 async def get(key: str, force: bool = False) -> Optional[str]:
-    return await measure_hits(key, lambda: _get(key, force=force))
+    return await measure_hits(key, lambda: _get(key))
 
 
 @REQUEST_DURATION.labels("GET").time()
-async def _get(key: str, force: bool = False) -> Optional[str]:
+async def _get(key: str) -> Optional[str]:
     try:
-        if force or instrumentation.NO_CACHE.get(False):
-            log.debug("cache bypassed", key=key)
-            return None
         if res := redis.get(key):
             return res.decode("utf-8")
         return None
@@ -240,6 +289,5 @@ async def _get(key: str, force: bool = False) -> Optional[str]:
 
 if REDIS_URL:
     log.info("connected to redis", host=REDIS_URL)
-    asyncio.create_task(ping())
 else:
     log.info("running with local redis", storage=DB_PATH)

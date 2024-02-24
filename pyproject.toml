@@ -18,21 +18,19 @@ prometheus-client = "^0.20.0"
 parse-torrent-title = "^2.8.1"
 pyyaml = "^6.0.1"
 ruff = "^0.2.2"
+pytest-asyncio = "^0.23.5"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.1.0"
-isort = "^5.13.2"
 pyright = "^1.1.348"
 pytest = "^8.0.0"
-pytest-watch = "^4.2.0"
 types-redis = "^4.6.0.20240106"
+aioresponses = "^0.7.6"
+pytest-cov = "^4.1.0"
+pytest-watcher = "^0.4.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.isort]
-profile = "black"
 
 [tool.black]
 line-length = 100
@@ -45,24 +43,36 @@ reportUnusedVariable = true
 reportUnusedFunction = true
 reportUnusedImport = true
 
-[tool.pytest.ini_options]
-filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 line-length = 100
-exclude = [
-    ".direnv",
-    ".git",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "build",
-    "dist",
-    "typings",
-    "venv",
+exclude = [ ".direnv", ".git", ".pyenv", ".pytest_cache", ".pytype", ".ruff_cache", ".vscode", "__pypackages__", "_build", "build", "dist", "typings", "venv"]
+
+[tool.ruff.lint]
+extend-select = [
+  "I",   # isort
+  "C90", # mccabe complexity
 ]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+
+
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
+log_cli_level = "CRITICAL"
+testpaths = ["tests"]
+addopts = "-v --durations=0"
+cache_dir = ".cache/pytest_cache"
+
+[tool.coverage.run]
+branch = true
+source = ["annatar"]
+command_line = "-m pytest"
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.xml]
+output = "coverage.xml"

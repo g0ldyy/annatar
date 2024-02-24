@@ -15,7 +15,7 @@ from annatar.debrid.providers import DebridService
 from annatar.jackett_models import SearchQuery
 from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
-from annatar.torrent import Torrent
+from annatar.torrent import TorrentMeta
 
 log = structlog.get_logger(__name__)
 
@@ -52,26 +52,24 @@ async def _search(
     )
 
     if type == "series" and len(season_episode) == 2:
-        q.season = str(season_episode[0])
-        q.episode = str(season_episode[1])
+        q.season = season_episode[0]
+        q.episode = season_episode[1]
 
-    torrents = await jackett.search_indexers(
-        search_query=q,
-        indexers=indexers,
-    )
+    results = await jackett.search_indexers(search_query=q, indexers=indexers)
+    log.info("found torrents", torrents=len(results))
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0
     total_processed: int = 0
     stop = asyncio.Event()
     async for link in debrid.get_stream_links(
-        torrents=torrents,
+        torrents=results,
         season_episode=season_episode,
         stop=stop,
         max_results=max_results,
     ):
         total_processed += 1
-        resolution: str = Torrent.parse_title(link.name).resolution
+        resolution: str = TorrentMeta.parse_title(link.name).resolution
 
         if len(resolution_links[resolution]) >= math.ceil(max_results / 2):
             log.debug("max results for resolution", resolution=resolution)
@@ -81,9 +79,12 @@ async def _search(
         total_links += 1
         if total_links >= max_results:
             log.debug("max results total")
+            stop.set()
             break
 
-    log.debug("found stream links", links=total_links, torrents=total_processed)
+    log.debug(
+        "found stream links", links=total_links, processed=total_processed, torrents=len(results)
+    )
     sorted_links: list[StreamLink] = list(
         sorted(
             chain(*resolution_links.values()),
@@ -92,49 +93,50 @@ async def _search(
         )
     )
 
-    streams: list[Stream] = []
-    for link in sorted_links:
-        meta: Torrent = Torrent.parse_title(link.name)
-        torrent_name_parts: list[str] = [f"{meta.title}"]
-        if type == "series":
-            torrent_name_parts.append(
-                f"S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
-                if meta.season and meta.episode
-                else ""
-            )
-            torrent_name_parts.append(f"{meta.episodeName}" if meta.episodeName else "")
-
-        torrent_name: str = " ".join(torrent_name_parts)
-        # squish the title portion before appending more parts
-        meta_parts: list[str] = []
-        if meta.resolution:
-            meta_parts.append(f"📺{meta.resolution}")
-        if meta.audio_channels:
-            meta_parts.append(f"🔊{meta.audio_channels}")
-        if meta.codec:
-            meta_parts.append(f"{meta.codec}")
-        if meta.quality:
-            meta_parts.append(f"{meta.quality}")
-
-        meta_parts.append(f"💾{human.bytes(float(link.size))}")
-
-        name = f"[{debrid.short_name()}+] Annatar"
-        name += f" {meta.resolution}" if meta.resolution else ""
-        name += f" {meta.audio_channels}" if meta.audio_channels else ""
-        streams.append(
-            Stream(
-                url=link.url.strip(),
-                title="\n".join(
-                    [
-                        torrent_name,
-                        arrange_into_rows(strings=meta_parts, rows=2),
-                    ]
-                ),
-                name=name.strip(),
-            )
-        )
+    streams: list[Stream] = [map_stream_link(link=link, debrid=debrid) for link in sorted_links]
 
     return StreamResponse(streams=streams)
+
+
+def map_stream_link(link: StreamLink, debrid: DebridService) -> Stream:
+    meta: TorrentMeta = TorrentMeta.parse_title(link.name)
+    torrent_name_parts: list[str] = [f"{meta.title}"]
+    if type == "series":
+        torrent_name_parts.append(
+            f"S{str(meta.season[0]).zfill(1)}E{str(meta.episode[0]).zfill(2)}"
+            if meta.season and meta.episode
+            else ""
+        )
+        torrent_name_parts.append(f"{meta.episodeName}" if meta.episodeName else "")
+
+    torrent_name: str = " ".join(torrent_name_parts)
+    # squish the title portion before appending more parts
+    meta_parts: list[str] = []
+    if meta.resolution:
+        meta_parts.append(f"📺{meta.resolution}")
+    if meta.audio_channels:
+        meta_parts.append(f"🔊{meta.audio_channels}")
+    if meta.codec:
+        meta_parts.append(f"{meta.codec}")
+    if meta.quality:
+        meta_parts.append(f"{meta.quality}")
+
+    meta_parts.append(f"💾{human.bytes(float(link.size))}")
+
+    name = f"[{debrid.short_name()}+] Annatar"
+    name += f" {meta.resolution}" if meta.resolution else ""
+    name += f" {meta.audio_channels}" if meta.audio_channels else ""
+
+    return Stream(
+        url=link.url.strip(),
+        title="\n".join(
+            [
+                torrent_name,
+                arrange_into_rows(strings=meta_parts, rows=2),
+            ]
+        ),
+        name=name.strip(),
+    )
 
 
 def arrange_into_rows(strings: list[str], rows: int) -> str:

@@ -1,15 +1,37 @@
+import asyncio
+import os
+from contextlib import asynccontextmanager
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from annatar import instrumentation, logging, middleware, routes, web
+from annatar.pubsub.consumers.torrent_processor import TorrentProcessor
 
 logging.init()
 instrumentation.init()
 
-app = FastAPI(title="Annatar", version="0.1.0")
+log = structlog.get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("starting torrent processors")
+    concurrency = int(os.getenv("TORRENT_PROCESSING_CONCURRENCY", 2))
+    worker_tasks = [
+        asyncio.create_task(TorrentProcessor.run(), name=f"torrent_processor_{i}")
+        for i in range(concurrency)
+    ]
+    yield
+    log.info("cancelling torrent processors")
+    all(t.cancel() for t in worker_tasks if not t.done())
+    log.info("shutting down")
+
+
+app = FastAPI(title="Annatar", version="0.1.0", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -17,7 +39,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(middleware.Metrics)
 app.add_middleware(middleware.RequestLogger)
 app.add_middleware(middleware.RequestID)
-app.add_middleware(middleware.CacheBust)
 
 app.add_route("/metrics", instrumentation.metrics_handler)
 

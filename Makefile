@@ -35,12 +35,17 @@ docker-manifest:
 	$(foreach arch,$(ARCHS),docker manifest annotate $(DOCKER_TAG) $(DOCKER_TAG)-$(arch) --arch $(arch) ;)
 	docker manifest push $(DOCKER_TAG)
 
-test:
+lint:
 	poetry run ruff check annatar
 	poetry run pyright annatar
-	poetry run isort --check --diff annatar run.py
-	poetry run black --check --diff annatar run.py
+
+test:
 	poetry run pytest $(PYTEST_FLAGS)
+
+coverage:
+	$(MAKE) --no-print-directory \
+		PYTEST_FLAGS="--cov --cov-report term-missing" \
+		test
 
 .PHONY: confirm
 confirm:

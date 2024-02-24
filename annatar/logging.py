@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import sys
 from typing import Any
 
 import structlog
@@ -8,6 +9,13 @@ import structlog
 from annatar import config
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
+logging.basicConfig(
+    format="%(message)s",
+    stream=sys.stderr,
+    level=logging._nameToLevel[LOG_LEVEL.upper()],
+)
 
 
 def add_code_info(logger: logging.Logger, method_name: str, event_dict: Any) -> dict[str, Any]:
@@ -21,6 +29,7 @@ def add_code_info(logger: logging.Logger, method_name: str, event_dict: Any) -> 
 
 structlog.configure(
     processors=[
+        structlog.stdlib.filter_by_level,
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
