@@ -3,6 +3,19 @@ stages:
   - docker_build
   - docker_push
 
+.default_rules:
+  rules:
+    # never run on schedules
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    # only run for non-empty branches
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        compare_to: 'refs/heads/master'
+        paths:
+          - '*'
+
+
 variables:
   DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
   DOCKER_DRIVER: overlay2
@@ -17,6 +30,12 @@ services:
 
 lint:
   stage: test
+  rules:
+    - !reference [.default_rules, rules]
+    - changes:
+        - '**/*.py'
+        - 'pyproject.toml'
+        - 'poetry.lock'
   image: python:3.11-slim
   script:
     - apt-get update && apt-get install make
@@ -26,6 +45,12 @@ lint:
 
 test:
   stage: test
+  rules:
+    - !reference [.default_rules, rules]
+    - changes:
+        - '**/*.py'
+        - 'pyproject.toml'
+        - 'poetry.lock'
   image: python:3.11-slim
   artifacts:
     reports:
@@ -39,7 +64,10 @@ test:
     - make test
 
 coverage:
-  only: [merge_requests]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - '**/*.py'
   stage: test
   image: python:3.11-slim
   artifacts:
@@ -57,12 +85,13 @@ coverage:
 
 amd64_build:
   stage: docker_build
+  rules:
+    - if: '$CI_COMMIT_TAG'
   image: docker:latest
   variables:
     BUILD_ARCH: linux/amd64
+    IMAGE_TAG: $CI_COMMIT_TAG
   before_script:
-    - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
-    - echo "Image tag set to $IMAGE_TAG"
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - apk add --no-cache make git
@@ -72,10 +101,12 @@ arm64_build:
   stage: docker_build
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /arm64$/'
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+    - if: '$CI_COMMIT_TAG'
   image: docker:latest
   variables:
     BUILD_ARCH: linux/arm64
+    IMAGE_TAG: $CI_COMMIT_TAG
   before_script:
     - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
     - echo "Image tag set to $IMAGE_TAG"
@@ -89,12 +120,10 @@ docker_manifest:
   image: docker:latest
   variables:
     BUILD_ARCH: linux/arm64
+    IMAGE_TAG: $CI_COMMIT_TAG
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /arm64$/'
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_TAG'
   before_script:
-    - 'if [ "$CI_COMMIT_BRANCH" = "master" ]; then export IMAGE_TAG=latest; else export IMAGE_TAG=$(echo $CI_COMMIT_REF_NAME | sed -e "s/[^a-zA-Z0-9_.-]/-/g"); fi'
-    - echo "Image tag set to $IMAGE_TAG"
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - apk add --no-cache qemu qemu-img git make
