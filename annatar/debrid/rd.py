@@ -80,8 +80,8 @@ async def get_torrent_link(
             return None
 
         selected_files: list[int] = [f.id for f in torrent.files if f.selected]
-        for i, file_id in enumerate(selected_files):
-            if file_id == file_id:
+        for i, fid in enumerate(selected_files):
+            if fid == file_id:
                 return torrent.links[i]
 
     log.error(
