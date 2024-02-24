@@ -115,12 +115,12 @@ async def search_indexers(
 ) -> list[str]:
     log.info("searching indexers", indexers=indexers)
 
-    cache_key: str = odm.Keys.torrents(
+    results = await odm.list_torrents(
         imdb=search_query.imdb_id,
         season=search_query.season,
         episode=search_query.episode,
     )
-    results = await odm.list_torrents(
+    cache_key: str = odm.Keys.torrents(
         imdb=search_query.imdb_id,
         season=search_query.season,
         episode=search_query.episode,
@@ -146,6 +146,10 @@ async def search_indexers(
 
     # offload to the background
     asyncio.create_task(offload_searches(search_query=search_query, indexers=indexers))
+    if search_query.episode:
+        without_episode = search_query.copy()
+        without_episode.episode = None
+        asyncio.create_task(offload_searches(search_query=without_episode, indexers=indexers))
 
     try:
         new_torrents = await asyncio.wait_for(
