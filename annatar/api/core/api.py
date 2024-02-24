@@ -136,19 +136,11 @@ def map_stream_link(link: StreamLink, debrid: DebridService) -> Stream:
         title="\n".join(
             [
                 torrent_name,
-                arrange_into_rows(strings=meta_parts, rows=2),
+                human.arrange_into_rows(strings=meta_parts, rows=2),
             ]
         ),
         name=name.strip(),
     )
-
-
-def arrange_into_rows(strings: list[str], rows: int) -> str:
-    split_index = (len(strings) + 1) // rows
-    first_row = strings[:split_index]
-    second_row = strings[split_index:]
-    arranged_string = "\n".join([" ".join(first_row), " ".join(second_row)])
-    return arranged_string
 
 
 REQUEST_DURATION = Histogram(

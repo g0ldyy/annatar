@@ -97,3 +97,11 @@ def rank_quality(name: str) -> int:
         if re.search(quality, name, re.IGNORECASE):
             return index * 5
     return 0
+
+
+def arrange_into_rows(strings: list[str], rows: int) -> str:
+    split_index = (len(strings) + 1) // rows
+    first_row = strings[:split_index]
+    second_row = strings[split_index:]
+    arranged_string = "\n".join([" ".join(first_row), " ".join(second_row)])
+    return arranged_string

@@ -57,6 +57,7 @@ RELEASE_NOTES.txt:
 	@git log --graph --format='%h - %s' \
 		--abbrev-commit $(CURRENT_GIT_TAG)..HEAD \
 		> $@
+	@vim $@
 
 release: RELEASE_NOTES.txt
 	@echo
