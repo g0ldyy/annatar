@@ -53,6 +53,8 @@ exclude = [ ".direnv", ".git", ".pyenv", ".pytest_cache", ".pytype", ".ruff_cach
 extend-select = [
   "I",   # isort
   "C90", # mccabe complexity
+  "B",   # flake8-bugbear
+  "PL",  # pycodestyle
 ]
 
 [tool.ruff.lint.isort]
