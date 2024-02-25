@@ -112,6 +112,7 @@ async def search_indexer(
 async def search_indexers(
     search_query: SearchQuery,
     indexers: list[str],
+    resolutions: list[str],
 ) -> list[str]:
     log.info("searching indexers", indexers=indexers)
 
@@ -119,6 +120,7 @@ async def search_indexers(
         imdb=search_query.imdb_id,
         season=search_query.season,
         episode=search_query.episode,
+        resolutions=resolutions,
     )
     cache_key: str = odm.Keys.torrents(
         imdb=search_query.imdb_id,
@@ -170,6 +172,7 @@ async def search_indexers(
         imdb=search_query.imdb_id,
         season=search_query.season,
         episode=search_query.episode,
+        resolutions=resolutions,
     )
     results.extend(new_torrents)
     return list(set(results))

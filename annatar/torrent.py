@@ -21,15 +21,12 @@ RESOLUTION_SCORES = {
     "720p": 1,
     "1080p": 2,
     # QHD
-    "1440p": 3,
+    "QHD": 3,
     # 4K
-    "2160p": 4,
     "4K": 4,
     # 5K
-    "2880p": 5,
     "5K": 5,
     # 8K
-    "4320p": 6,
     "8K": 6,
 }
 RESOLUTION_BITS_LENGTH = 3
@@ -77,6 +74,22 @@ class TorrentMeta(BaseModel):
     hdr: bool = False
     year: int = 0
     raw_title: str = ""
+
+    @field_validator("resolution", mode="before")
+    @classmethod
+    def standardize_resolution(cls: Any, v: Any):
+        if v is None:
+            return ""
+        if isinstance(v, str):
+            if v.lower() == "1440p":
+                return "QHD"
+            if v.lower() == "2160p":
+                return "4K"
+            if v.lower() == "2880p":
+                return "5K"
+            if v.lower() == "4320p":
+                return "8K"
+        return v
 
     @field_validator("season", "episode", "language", "subtitles", mode="before")
     @classmethod

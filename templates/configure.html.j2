@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,54 +7,88 @@
 	<script type="text/javascript">var __context = {{ ctx|tojson }};</script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.min.js" integrity="sha512-WW8/jxkELe2CAiE4LvQfwm1rajOS8PHasCCx+knHG0gBHt8EXxS6T6tJRTGuDQVnluuAvMxWF4j8SNFDKceLFg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+	<link rel="stylesheet" href="/static/css/styles.css"></link>	
 	<script src="/static/js/index.js"></script>
 
 </head>
-<body>
 
-<div class="container py-5">
-	<form id="theform">
-		<!-- Floating Form Group for Provider -->
-		<div class="form-floating mb-3">
-			<select class="form-select" id="debrid_service" name="debrid_service" aria-label="Debrid Provider">
-				{% for provider in ctx.available_debrid_providers %}
-				<option required value="{{ provider.id }}">{{ provider.name }}</option>
-				{% endfor %}
-			</select>
-			<label for="provider">Debrid Provider</label>
-		</div>
-
-		<div class="form-floating mb-3">
-			<input required type="password" class="form-control" id="debrid_api_key" name="debrid_api_key" placeholder="API Key">
-			<label for="debrid_api_key">Debrid API Key</label>
-		</div>
-
-		<!-- Floating Form Group for Max Results -->
-		<div class="form-floating mb-3">
-			<select required class="form-select" id="max_results" name="max_results" aria-label="Max Results">
-				<option value="3">3</option>
-				<option selected value="5">5</option>
-				<option value="10">10</option>
-			</select>
-			<label for="max_results">Max Results</label>
-		</div>
-
-		<!-- Checkboxes for Multi-Select Example -->
-		<fieldset class="mb-3">
-			<legend>Indexers</legend>
-			{% for indexer in ctx.available_indexers %}
-			<div class="form-check">
-				<input checked class="form-check-input" type="checkbox" id="{{ indexer.id }}" name="indexers[]" value="{{ indexer.id }}">
-				<label class="form-check-label" for="{{ indexer.id }}">{{ indexer.name }}</label>
+<body class="d-flex align-items-center" style="min-height: 100vh;">
+<div class="container py-5 my-auto">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+			<div class="banner mb-3 p-3 text-center">
+				<h1>Annatar - Lord of Gifts</h1>
+				<p>v0.7.2</p>
+				<p>
+					Watch movies and tv shows from torrent indexers that are cached
+					on Debrid services. This is a free community edition. Enjoy!
+				</p>
+				<p>
+					I build and maintain Annatar in my spare time. If you like it, please consider
+					<a href="https://ko-fi.com/annatar"> buying me a beer</a>. Cheers!
+				</p>
 			</div>
-			{% endfor %}
-		</fieldset>
+			<form id="theform">
+				<div class="form-floating mb-3">
+					<select class="form-select" id="debrid_service" name="debrid_service" aria-label="Debrid Provider">
+						{% for provider in ctx.available_debrid_providers %}
+						<option required value="{{ provider.id }}">{{ provider.name }}</option>
+						{% endfor %}
+					</select>
+					<label for="provider">Debrid Provider</label>
+				</div>
 
+				<div class="form-floating mb-3">
+					<input required type="password" class="form-control" id="debrid_api_key" name="debrid_api_key" placeholder="API Key">
+					<label for="debrid_api_key">Debrid API Key</label>
+				</div>
 
-		<div class="d-grid gap-2">
-		<button type="submit" class="btn btn-primary btn-lg">Install</button>
+				<div class="form-floating mb-3">
+					<select required class="form-select" id="max_results" name="max_results" aria-label="Max Results">
+						<option value="3">3</option>
+						<option selected value="5">5</option>
+						<option value="10">10</option>
+					</select>
+					<label for="max_results">Max Results</label>
+				</div>
+
+				<div class="row">
+				  <div class="col-md-6">
+					<fieldset class="mb-3">
+					  <legend>Indexers</legend>
+					  {% for indexer in ctx.available_indexers %}
+					  <div class="form-check">
+						<input checked class="form-check-input" type="checkbox" id="{{ indexer.id }}" name="indexers[]" value="{{ indexer.id }}">
+						<label class="form-check-label" for="{{ indexer.id }}">{{ indexer.name }}</label>
+					  </div>
+					  {% endfor %}
+					</fieldset>
+				  </div> <!-- col -->
+
+				  <div class="col-md-6">
+					<fieldset class="mb-3">
+					  <legend>Resolutions</legend>
+					  {% for resolution in ctx.available_resolutions %}
+					  <div class="form-check">
+						<input selected="selected" class="form-check-input" type="checkbox" id="{{ resolution }}" name="resolutions[]" value="{{ resolution }}">
+						<label class="form-check-label" for="{{ resolution }}">{{ resolution }}</label>
+					  </div>
+					  {% endfor %}
+					</fieldset>
+				  </div> <!-- col -->
+				</div> <!-- row -->
+
+				<div class="d-grid gap-2 mb-3">
+				<button type="submit" class="btn btn-primary btn-lg">Install</button>
+				</div>
+
+				<div class="form-group mb-3">
+				  <label class="text-muted" for="formDataDisplay">Click install or paste this into your Stremio search bar</label>
+				  <textarea disabled class="form-control mb-3" id="formDataDisplay" rows="3"></textarea>
+				</div>
+			</form>
 		</div>
-	</form>
+	</div>
 </div>
 
 </body>

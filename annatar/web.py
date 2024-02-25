@@ -28,6 +28,7 @@ class Indexer(BaseModel):
 class FormConfig(BaseModel):
     app_id: str = APP_ID
     available_indexers: list[Indexer]
+    available_resolutions: list[str]
     available_debrid_providers: list[dict[str, str]]
 
     user_config: UserConfig
@@ -54,6 +55,7 @@ async def configure(request: Request, config: UserConfig) -> HTMLResponse:
         user_config=config,
         available_indexers=indexers,
         available_debrid_providers=list_providers(),
+        available_resolutions=["4K", "QHD", "1080p", "720p", "480p"],
     )
     return templates.TemplateResponse(
         request=request,

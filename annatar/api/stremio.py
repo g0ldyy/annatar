@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
 from annatar.api.core import streams
-from annatar.config import UserConfig, parse_config
+from annatar.config import APP_ID, VERSION, UserConfig, parse_config
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
 from annatar.debrid.real_debrid_provider import RealDebridProvider
@@ -35,22 +35,27 @@ async def root_redirect() -> RedirectResponse:
     return RedirectResponse(url="/configure", status_code=HTTP_302_FOUND)
 
 
-@router.get("/{b64config:str}/manifest.json")
-async def get_manifst_with_config(request: Request) -> dict[str, Any]:
-    return await get_manifest(request)
-
-
 @router.get("/manifest.json")
-async def get_manifest(request: Request) -> dict[str, Any]:
+async def get_manifst_with_config() -> dict[str, Any]:
+    return await get_manifest("")
+
+
+@router.get("/{b64config:str}/manifest.json")
+async def get_manifest(b64config: str) -> dict[str, Any]:
+    config: UserConfig = parse_config(b64config)
+    debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
+    app_name: str = "Annatar"
+    if debrid:
+        app_name = f"{app_name} {debrid.short_name()}"
     return {
-        "id": request.url.hostname,
+        "id": APP_ID,
         "icon": "https://i.imgur.com/p4V821B.png",
-        "version": "0.1.0",
+        "version": VERSION,
         "catalogs": [],
         "idPrefixes": ["tt"],
         "resources": ["stream"],
         "types": MediaType.all(),
-        "name": "Annatar",
+        "name": app_name,
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
             "configurable": True,
@@ -68,7 +73,7 @@ async def get_hashes(
 ) -> dict[str, Any]:
     hashes = await streams.get_hashes(imdb_id=imdb_id, limit=limit, season=season, episode=episode)
     return {
-        "hashes": [v.value for v in hashes],
+        "hashes": hashes,
     }
 
 
@@ -126,6 +131,7 @@ async def list_streams(
         season_episode=season_episode,
         max_results=config.max_results,
         indexers=config.indexers,
+        resolutions=config.resolutions,
     )
 
     for stream in res.streams:

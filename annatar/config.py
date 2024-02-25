@@ -2,20 +2,20 @@ import os
 from base64 import b64decode
 
 import structlog
-from fastapi import HTTPException
-from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 log = structlog.get_logger()
 
-APP_ID = "community.annatar.addon"
+APP_ID = "community.annatar.addon.stremio"
 ENV = os.getenv("ENV", "dev")
+VERSION = os.getenv("BUILD_VERSION", "0.1.0")
 
 
 class UserConfig(BaseModel):
     debrid_service: str
     debrid_api_key: str
     indexers: list[str]
+    resolutions: list[str] = ["4K", "QHD", "1080p", "720p", "480p"]
     max_results: int = 5
 
     @staticmethod
@@ -29,13 +29,10 @@ class UserConfig(BaseModel):
 
 
 def parse_config(b64config: str) -> UserConfig:
+    if not b64config:
+        return UserConfig.defaults()
     try:
         return UserConfig.model_validate_json(b64decode(b64config))
-    except ValidationError as e:
-        log.warning("error decoding config", exc_info=e, errro_type=type(e).__name__)
-        raise RequestValidationError(
-            errors=e.errors(include_url=False, include_input=False),
-        ) from e
     except Exception as e:
-        log.error("Unrecognized error", exc_info=e)
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+        log.error("Unrecognized config parsing error", exc_info=e)
+        return UserConfig.defaults()
