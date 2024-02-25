@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
-from annatar.api.core import api
+from annatar.api.core import streams
 from annatar.config import UserConfig, parse_config
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
@@ -66,7 +66,7 @@ async def get_hashes(
     season: Annotated[int | None, Query(description="Season", defualt=None)] = None,
     episode: Annotated[int | None, Query(description="Episode", defualt=None)] = None,
 ) -> dict[str, Any]:
-    hashes = await api.get_hashes(imdb_id=imdb_id, limit=limit, season=season, episode=episode)
+    hashes = await streams.get_hashes(imdb_id=imdb_id, limit=limit, season=season, episode=episode)
     return {
         "hashes": [v.value for v in hashes],
     }
@@ -119,7 +119,7 @@ async def list_streams(
 
     imdb_id: str = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
-    res: StreamResponse = await api.search(
+    res: StreamResponse = await streams.search(
         type=type,
         debrid=debrid,
         imdb_id=imdb_id,

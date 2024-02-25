@@ -9,11 +9,11 @@ import structlog
 from prometheus_client import Counter, Histogram
 
 from annatar import human, instrumentation, jackett
+from annatar.clients.cinemeta import MediaInfo, get_media_info
 from annatar.database import db
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.jackett_models import SearchQuery
-from annatar.meta.cinemeta import MediaInfo, get_media_info
 from annatar.stremio import Stream, StreamResponse
 from annatar.torrent import TorrentMeta
 
