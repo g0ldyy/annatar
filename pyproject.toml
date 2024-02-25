@@ -86,14 +86,3 @@ log_cli_level = "CRITICAL"
 testpaths = ["tests"]
 addopts = "-v --durations=0"
 cache_dir = ".cache/pytest_cache"
-
-[tool.coverage.run]
-branch = true
-source = ["annatar"]
-command_line = "-m pytest"
-
-[tool.coverage.report]
-show_missing = true
-
-[tool.coverage.xml]
-output = "coverage.xml"
