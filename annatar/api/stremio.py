@@ -51,7 +51,7 @@ async def get_manifest(b64config: str) -> dict[str, Any]:
     if debrid:
         app_name = f"{app_name} {debrid.short_name()}"
     return {
-        "id": config.APP_ID,
+        "id": config.APP_ID + debrid.short_name() if debrid else config.APP_ID,
         "icon": "https://i.imgur.com/p4V821B.png",
         "version": config.VERSION.removeprefix("v"),
         "catalogs": [],
