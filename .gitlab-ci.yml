@@ -67,6 +67,8 @@ coverage:
 
 amd64_build:
   stage: docker_build
+  needs:
+    - test
   rules:
     - if: '$CI_COMMIT_TAG'
   image: docker:latest
@@ -81,6 +83,8 @@ amd64_build:
 
 arm64_build:
   stage: docker_build
+  needs:
+    - test
   rules:
     - if: '$CI_COMMIT_TAG'
   image: docker:latest
@@ -95,6 +99,9 @@ arm64_build:
 
 docker_manifest:
   stage: docker_push
+  needs:
+    - amd64_build
+    - arm64_build
   image: docker:latest
   variables:
     BUILD_ARCH: linux/arm64
