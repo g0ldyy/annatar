@@ -9,7 +9,7 @@ log = structlog.get_logger()
 APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
 APP_NAME = os.getenv("APP_NAME", "Annatar")
 ENV = os.getenv("ENV", "dev")
-VERSION = os.getenv("BUILD_VERSION", "0.1.0")
+VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
 
 
 class UserConfig(BaseModel):

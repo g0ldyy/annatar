@@ -59,7 +59,7 @@
 					  <legend>Resolutions</legend>
 					  {% for resolution in ctx.available_resolutions %}
 					  <div class="form-check">
-						<input selected="selected" class="form-check-input" type="checkbox" id="{{ resolution }}" name="resolutions[]" value="{{ resolution }}">
+						<input checked class="form-check-input" type="checkbox" id="{{ resolution }}" name="resolutions[]" value="{{ resolution }}">
 						<label class="form-check-label" for="{{ resolution }}">{{ resolution }}</label>
 					  </div>
 					  {% endfor %}

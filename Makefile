@@ -1,11 +1,14 @@
-GLAB_CMD   ?= glab
-IMAGE_NAME ?= annatar
-IMAGE_TAG  ?= latest
-BUILD_ARCH ?= linux/amd64
-ARCHS       = amd64 arm64
+CURRENT_GIT_TAG  = $(shell git describe --tags --abbrev=0)
+
+BUILD_VERSION ?= $(shell git describe --tags)
+GLAB_CMD      ?= glab
+IMAGE_NAME    ?= annatar
+IMAGE_TAG     ?= $(BUILD_VERSION)
+BUILD_ARCH    ?= linux/amd64
+ARCHS          = amd64 arm64
 
 ifdef CI_REGISTRY_IMAGE
-	IMAGE_NAME := $(CI_REGISTRY_IMAGE)
+IMAGE_NAME := $(CI_REGISTRY_IMAGE)
 endif
 
 ARCH_SUFFIX       = $(shell echo $(BUILD_ARCH) | cut -d '/' -f2)
@@ -16,13 +19,12 @@ DOCKER_TAG_ARCH  := $(DOCKER_TAG)-$(ARCH_SUFFIX)
 
 PYTEST_FLAGS ?= 
 
-CURRENT_GIT_TAG  = $(shell git describe --tags --abbrev=0)
 RELEASE_VERSION ?= $(shell git describe --tags --abbrev=0 | awk -F. '{print $$1 "." $$2 "." $$3+1}')
 
 # Build and push container for BUILD_ARCH
 container:
 	docker build --platform $(BUILD_ARCH) \
-		--build-arg BUILD_VERSION=$(shell git describe --tags) \
+		--build-arg BUILD_VERSION=$(BUILD_VERSION) \
 		$(DOCKER_PUSH) \
 		--cache-from=$(DOCKER_TAG_ARCH) \
 		-f $(DOCKERFILE) \

@@ -1,4 +1,3 @@
-ARG BUILD_VERSION=UNKNOWN
 # --- Build Stage ---
 FROM python:3.11 as builder
 
@@ -31,8 +30,6 @@ RUN poetry build
 # --- Final Stage ---
 FROM python:3.11-slim as final
 
-ENV BUILD_VERSION=${BUILD_VERSION}
-
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -54,5 +51,8 @@ COPY ./static /app/static
 COPY ./templates /app/templates
 
 COPY run.py /app/run.py
+
+ARG BUILD_VERSION=UNKNOWN
+ENV BUILD_VERSION=${BUILD_VERSION}
 
 CMD ["python", "run.py"]

@@ -53,7 +53,7 @@ async def get_manifest(b64config: str) -> dict[str, Any]:
     return {
         "id": config.APP_ID,
         "icon": "https://i.imgur.com/p4V821B.png",
-        "version": config.VERSION,
+        "version": config.VERSION.removeprefix("v"),
         "catalogs": [],
         "idPrefixes": ["tt"],
         "resources": ["stream"],
