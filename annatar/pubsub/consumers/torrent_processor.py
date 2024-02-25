@@ -132,9 +132,8 @@ async def map_search_result(result: TorrentSearchResult) -> Torrent | None:
         meta: TorrentMeta = TorrentMeta.parse_title(result.title)
         torrent: Torrent = meta.with_info_hash(info_hash)
         return torrent
-    else:
-        log.debug("no info hash found", guid=result.guid, link=result.magnet_link)
-        return
+    log.debug("no info hash found", guid=result.guid, link=result.magnet_link)
+    return None
 
 
 async def resolve_magnet_link(guid: str, link: str) -> str | None:
@@ -147,7 +146,7 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
     if link.startswith("magnet"):
         return magnet.parse_magnet_link(link)
     if not link.startswith("http"):
-        return
+        return None
 
     cache_key: str = f"magnet:resolve:{guid}"
     try:
@@ -156,24 +155,23 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
             return info_hash
 
         log.debug("magnet resolve: following redirect", guid=guid, link=link)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                link,
-                allow_redirects=False,
-                timeout=MAGNET_RESOLVE_TIMEOUT,
-            ) as response:
-                if response.status != 302:
-                    log.warn("magnet resolve: no redirect found", guid=guid, status=response.status)
-                    return None
+        async with aiohttp.ClientSession() as session, session.get(
+            link,
+            allow_redirects=False,
+            timeout=MAGNET_RESOLVE_TIMEOUT,
+        ) as response:
+            if response.status != 302:
+                log.warn("magnet resolve: no redirect found", guid=guid, status=response.status)
+                return None
 
-                location = response.headers.get("Location", "")
-                if not location:
-                    return None
+            location = response.headers.get("Location", "")
+            if not location:
+                return None
 
-                info_hash = magnet.parse_magnet_link(location)
-                log.debug("magnet resolve: found redirect", info_hash=info_hash, location=location)
-                await db.set(cache_key, info_hash, ttl=timedelta(weeks=8))
-                return info_hash
+            info_hash = magnet.parse_magnet_link(location)
+            log.debug("magnet resolve: found redirect", info_hash=info_hash, location=location)
+            await db.set(cache_key, info_hash, ttl=timedelta(weeks=8))
+            return info_hash
     except TimeoutError:
         log.warn("magnet resolve: timeout")
         return None

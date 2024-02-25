@@ -55,8 +55,8 @@ async def ping() -> bool:
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-async def get_model(key: str, model: Type[TBaseModel], force: bool = False) -> Optional[TBaseModel]:
-    res: Optional[str] = await get(key, force=force)
+async def get_model(key: str, model: Type[TBaseModel]) -> Optional[TBaseModel]:
+    res: Optional[str] = await get(key)
     if res is None:
         return None
     try:
@@ -272,7 +272,7 @@ async def ttl(key: str) -> int:
     return redis.ttl(key)
 
 
-async def get(key: str, force: bool = False) -> Optional[str]:
+async def get(key: str) -> Optional[str]:
     return await measure_hits(key, lambda: _get(key))
 
 

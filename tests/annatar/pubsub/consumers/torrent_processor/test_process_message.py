@@ -49,7 +49,7 @@ def mock_search_result(title: str) -> TorrentSearchResult:
 class map_matched_result(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
-        assert db.redis.ping()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
         db.redis.flushall()
@@ -78,7 +78,7 @@ class map_matched_result(unittest.IsolatedAsyncioTestCase):
 class ProcessMessage(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
-        assert db.redis.ping()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
         db.redis.flushall()
@@ -157,7 +157,7 @@ class ProcessMessage(unittest.IsolatedAsyncioTestCase):
 class ResolveMagnetLink(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
-        assert db.redis.ping()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
         db.redis.flushall()

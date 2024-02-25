@@ -74,6 +74,7 @@ def find_episode(file: str) -> int | None:
     match = re.search(r"[^A-Z]E(\d\d?)\b", file, re.IGNORECASE)
     if match:
         return int(match.group(1))
+    return None
 
 
 def match_season_episode(season_episode: list[int], file: str) -> bool:
@@ -103,5 +104,4 @@ def arrange_into_rows(strings: list[str], rows: int) -> str:
     split_index = (len(strings) + 1) // rows
     first_row = strings[:split_index]
     second_row = strings[split_index:]
-    arranged_string = "\n".join([" ".join(first_row), " ".join(second_row)])
-    return arranged_string
+    return "\n".join([" ".join(first_row), " ".join(second_row)])

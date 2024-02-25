@@ -1,4 +1,5 @@
-import pytest
+import unittest
+
 from pydantic import BaseModel
 
 from annatar.human import find_episode
@@ -9,36 +10,27 @@ class SeasonEpisodeTest(BaseModel):
     expected_result: int | None
 
 
-# Define your test data as a dictionary
-test_data: dict[str, SeasonEpisodeTest] = {
-    "matches_dot": SeasonEpisodeTest(
-        file="Foobar.S01.E01.mkv",
-        expected_result=1,
-    ),
-    "matches_dash": SeasonEpisodeTest(
-        file="Foobar-S01-E02.mkv",
-        expected_result=2,
-    ),
-    "matches_space": SeasonEpisodeTest(
-        file="Foobar S01 E03.mkv",
-        expected_result=3,
-    ),
-    "matches_no_space": SeasonEpisodeTest(
-        file="FoobarS01E04.mkv",
-        expected_result=4,
-    ),
-    "matches_no_leading_zero": SeasonEpisodeTest(
-        file="FoobarS1E5.mkv",
-        expected_result=5,
-    ),
-    "matches_double_digit": SeasonEpisodeTest(
-        file="FoobarS01E10.mkv",
-        expected_result=10,
-    ),
-}
+class TestFindEpisode(unittest.TestCase):
+    def test_matches_dot(self):
+        result: int | None = find_episode("Foobar.S01.E01.mkv")
+        self.assertEqual(result, 1)
 
+    def test_matches_dash(self):
+        result: int | None = find_episode("Foobar-S01-E02.mkv")
+        self.assertEqual(result, 2)
 
-@pytest.mark.parametrize("name, t", test_data.items())
-def test_function(name: str, t: SeasonEpisodeTest):
-    result: int | None = find_episode(t.file)
-    assert result == t.expected_result
+    def test_matches_space(self):
+        result: int | None = find_episode("Foobar S01 E03.mkv")
+        self.assertEqual(result, 3)
+
+    def test_matches_no_space(self):
+        result: int | None = find_episode("FoobarS01E04.mkv")
+        self.assertEqual(result, 4)
+
+    def test_matches_no_leading_zero(self):
+        result: int | None = find_episode("FoobarS1E5.mkv")
+        self.assertEqual(result, 5)
+
+    def test_matches_double_digit(self):
+        result: int | None = find_episode("FoobarS01E10.mkv")
+        self.assertEqual(result, 10)

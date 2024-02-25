@@ -1,7 +1,7 @@
 import os
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.responses import Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -38,7 +38,7 @@ HTTP_CLIENT_REQUEST_DURATION = Histogram(
 )
 
 
-async def metrics_handler(request: Request):
+async def metrics_handler(_: Request):
     data = generate_latest(registry())
     return Response(
         content=data,
@@ -53,6 +53,6 @@ def init():
     return
 
 
-def shutdown(app: FastAPI):
+def shutdown():
     log.info("shutdown prometheus multiprocess_mode")
     multiprocess.mark_process_dead(os.getpid())  # type: ignore

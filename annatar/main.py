@@ -19,7 +19,7 @@ log = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     log.info("starting torrent processors")
     concurrency = int(os.getenv("TORRENT_PROCESSING_CONCURRENCY", "2"))
     worker_tasks = [
@@ -46,7 +46,7 @@ app.add_route("/metrics", instrumentation.metrics_handler)
 
 # handle CORS preflight requests
 @app.options("/{rest_of_path:path}")
-async def preflight_handler(request: Request, rest_of_path: str) -> Response:
+async def preflight_handler() -> Response:
     return Response(
         status_code=200,
         headers={

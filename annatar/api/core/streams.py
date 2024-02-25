@@ -165,16 +165,15 @@ async def get_hashes(
         cache_key += f":{season}:{episode}"
         res = await db.unique_list_get_scored(cache_key)
         return res[:limit]
-    else:
-        items: dict[str, db.ScoredItem] = {}
-        cache_key += f":{season}:*"
-        keys = await db.list_keys(f"{cache_key}:*")
-        for values in asyncio.gather(asyncio.create_task(db.unique_list_get(key)) for key in keys):
-            for value in values:
-                items[value.value] = value
-                if len(items) >= limit:
-                    return list(items.values())[:limit]
-        return list(items.values())[:limit]
+    items: dict[str, db.ScoredItem] = {}
+    cache_key += f":{season}:*"
+    keys = await db.list_keys(f"{cache_key}:*")
+    for values in asyncio.gather(asyncio.create_task(db.unique_list_get(key)) for key in keys):
+        for value in values:
+            items[value.value] = value
+            if len(items) >= limit:
+                return list(items.values())[:limit]
+    return list(items.values())[:limit]
 
 
 async def search(
@@ -189,13 +188,12 @@ async def search(
         indexers = []
     if season_episode is None:
         season_episode = []
-    res: Optional[StreamResponse] = None
     with REQUEST_DURATION.labels(
         type=type,
         debrid_service=debrid.id(),
     ).time():
         try:
-            res = await _search(
+            return await _search(
                 type=type,
                 max_results=max_results,
                 debrid=debrid,
@@ -203,8 +201,6 @@ async def search(
                 season_episode=season_episode,
                 indexers=indexers,
             )
-            return res
         except Exception as e:
             log.error("error searching", type=type, id=imdb_id, exc_info=e)
-            res = StreamResponse(streams=[], error="Error searching")
-            return res
+            return StreamResponse(streams=[], error="Error searching")

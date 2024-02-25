@@ -37,13 +37,11 @@ class FormConfig(BaseModel):
 async def configure_existing(request: Request, b64config: str):
     config: UserConfig = parse_config(b64config)
     return await configure(request, config)
-    pass
 
 
 @router.get("/configure")
 async def configure_new(request: Request):
     return await configure(request, UserConfig.defaults())
-    pass
 
 
 async def configure(request: Request, config: UserConfig) -> HTMLResponse:
@@ -71,24 +69,23 @@ async def get_indexer_name(id: str) -> str:
 
     url = f"https://raw.githubusercontent.com/Jackett/Jackett/aa44dc864975a2480aee979351c4284b6a49acf6/src/Jackett.Common/Definitions/{id}.yml"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    log.error("Failed to get indexer name", id=id, url=url, status=resp.status)
-                    return id
-                raw = await resp.text()
-                data = yaml.safe_load(raw)
-                if name := data.get("name"):
-                    await db.set(cache_key, name, ttl=timedelta(days=30))
-                    return name
-                log.error(
-                    "indexer name was not in response document",
-                    id=id,
-                    url=url,
-                    data=data,
-                    status_code=resp.status,
-                )
+        async with aiohttp.ClientSession() as session, session.get(url) as resp:
+            if resp.status != 200:
+                log.error("Failed to get indexer name", id=id, url=url, status=resp.status)
                 return id
+            raw = await resp.text()
+            data = yaml.safe_load(raw)
+            if name := data.get("name"):
+                await db.set(cache_key, name, ttl=timedelta(days=30))
+                return name
+            log.error(
+                "indexer name was not in response document",
+                id=id,
+                url=url,
+                data=data,
+                status_code=resp.status,
+            )
+            return id
     except Exception as e:
         log.error("Failed to get indexer name", id=id, url=url, exc_info=e)
     return id

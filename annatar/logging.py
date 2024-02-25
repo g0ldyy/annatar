@@ -14,11 +14,11 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 logging.basicConfig(
     format="%(message)s",
     stream=sys.stderr,
-    level=logging._nameToLevel[LOG_LEVEL.upper()],
+    level=LOG_LEVEL.upper(),
 )
 
 
-def add_code_info(logger: logging.Logger, method_name: str, event_dict: Any) -> dict[str, Any]:
+def add_code_info(_: logging.Logger, __: str, event_dict: Any) -> dict[str, Any]:
     frame = inspect.currentframe().f_back.f_back.f_back.f_back.f_back  # type: ignore
     event_dict["code_func"] = frame.f_code.co_name  # type: ignore
     # fname: str = frame.f_code.co_filename.replace(root_dir, "").lstrip("/")  # type: ignore

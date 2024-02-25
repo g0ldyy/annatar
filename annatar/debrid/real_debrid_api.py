@@ -30,22 +30,22 @@ async def make_request(
     status_code: str = "2xx"
     error = False
     try:
-        async with aiohttp.ClientSession() as session:
-            api_headers = {"Authorization": f"Bearer {debrid_token}"}
-            async with session.request(method, api_url, headers=api_headers, data=body) as response:
-                status_code = f"{response.status//100}xx"
-                if response.status not in range(200, 300):
-                    error = True
-                    log.error(
-                        "Error making request",
-                        status=response.status,
-                        reason=response.reason,
-                        url=api_url,
-                        body=await response.text(),
-                    )
-                    return None
-                response_json = await response.json()
-                return response_json
+        api_headers = {"Authorization": f"Bearer {debrid_token}"}
+        async with aiohttp.ClientSession() as session, session.request(
+            method, api_url, headers=api_headers, data=body
+        ) as response:
+            status_code = f"{response.status//100}xx"
+            if response.status not in range(200, 300):
+                error = True
+                log.error(
+                    "Error making request",
+                    status=response.status,
+                    reason=response.reason,
+                    url=api_url,
+                    body=await response.text(),
+                )
+                return None
+            return await response.json()
     finally:
         instrumentation.HTTP_CLIENT_REQUEST_DURATION.labels(
             client="real_debrid",

@@ -63,7 +63,7 @@ async def get_torrent_link(
     info_hash: str,
     debrid_token: str,
 ) -> str | None:
-    for attempt in range(0, 5):
+    for attempt in range(5):
         torrent: TorrentInfo | None = await api.get_torrent_info(torrent_id, debrid_token)
         if not torrent:
             log.error("torrent info wasn't found")
@@ -223,7 +223,7 @@ async def get_stream_link(
                 torrent=info_hash,
                 file_id=file_id,
             )
-            return
+            return None
 
         log.debug("found matching instantAvailable set")
         # this route has to match the route provided to provide the 302
@@ -240,6 +240,7 @@ async def get_stream_link(
             name=file.filename,
             url=url,
         )
+    return None
 
 
 async def get_stream_links(

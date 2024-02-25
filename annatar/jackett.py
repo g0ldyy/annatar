@@ -141,8 +141,8 @@ async def search_indexers(
     if len(results) > 0:
         log.debug("torrents are stale, refreshing", imdb=search_query.imdb_id)
         return results
-    else:
-        log.debug("no results in cache, searching indexers", imdb=search_query.imdb_id)
+
+    log.debug("no results in cache, searching indexers", imdb=search_query.imdb_id)
 
     # offload to the background
     asyncio.create_task(offload_searches(search_query=search_query, indexers=indexers))
