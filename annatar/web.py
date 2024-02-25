@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from annatar import jackett
-from annatar.config import APP_ID, UserConfig, parse_config
+from annatar.config import APP_ID, VERSION, UserConfig, parse_config
 from annatar.database import db
 from annatar.debrid.providers import list_providers
 
@@ -27,6 +27,7 @@ class Indexer(BaseModel):
 
 class FormConfig(BaseModel):
     app_id: str = APP_ID
+    version: str = VERSION
     available_indexers: list[Indexer]
     available_resolutions: list[str]
     available_debrid_providers: list[dict[str, str]]

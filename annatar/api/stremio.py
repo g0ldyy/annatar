@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Path, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
+from annatar import config
 from annatar.api.core import streams
-from annatar.config import APP_ID, VERSION, UserConfig, parse_config
+from annatar.config import UserConfig
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
 from annatar.debrid.real_debrid_provider import RealDebridProvider
@@ -42,15 +43,17 @@ async def get_manifst_with_config() -> dict[str, Any]:
 
 @router.get("/{b64config:str}/manifest.json")
 async def get_manifest(b64config: str) -> dict[str, Any]:
-    config: UserConfig = parse_config(b64config)
-    debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
-    app_name: str = "Annatar"
+    user_config: UserConfig = config.parse_config(b64config)
+    debrid: Optional[DebridService] = get_provider(
+        user_config.debrid_service, user_config.debrid_api_key
+    )
+    app_name: str = config.APP_NAME
     if debrid:
         app_name = f"{app_name} {debrid.short_name()}"
     return {
-        "id": APP_ID,
+        "id": config.APP_ID,
         "icon": "https://i.imgur.com/p4V821B.png",
-        "version": VERSION,
+        "version": config.VERSION,
         "catalogs": [],
         "idPrefixes": ["tt"],
         "resources": ["stream"],
@@ -117,8 +120,10 @@ async def list_streams(
     ],
     b64config: Annotated[str, Path(description="base64 encoded json blob")],
 ) -> StreamResponse:
-    config: UserConfig = parse_config(b64config)
-    debrid: Optional[DebridService] = get_provider(config.debrid_service, config.debrid_api_key)
+    user_config: UserConfig = config.parse_config(b64config)
+    debrid: Optional[DebridService] = get_provider(
+        user_config.debrid_service, user_config.debrid_api_key
+    )
     if not debrid:
         raise HTTPException(status_code=400, detail="Invalid debrid service")
 
@@ -129,9 +134,9 @@ async def list_streams(
         debrid=debrid,
         imdb_id=imdb_id,
         season_episode=season_episode,
-        max_results=config.max_results,
-        indexers=config.indexers,
-        resolutions=config.resolutions,
+        max_results=user_config.max_results,
+        indexers=user_config.indexers,
+        resolutions=user_config.resolutions,
     )
 
     for stream in res.streams:

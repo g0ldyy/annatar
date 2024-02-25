@@ -6,7 +6,8 @@ from pydantic import BaseModel
 
 log = structlog.get_logger()
 
-APP_ID = "community.annatar.addon.stremio"
+APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
+APP_NAME = os.getenv("APP_NAME", "Annatar")
 ENV = os.getenv("ENV", "dev")
 VERSION = os.getenv("BUILD_VERSION", "0.1.0")
 
