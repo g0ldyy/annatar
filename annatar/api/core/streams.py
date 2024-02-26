@@ -7,6 +7,7 @@ from typing import Optional
 
 import structlog
 from prometheus_client import Counter, Histogram
+from pydantic import ValidationError
 
 from annatar import human, instrumentation, jackett
 from annatar.clients.cinemeta import MediaInfo, get_media_info
@@ -100,7 +101,13 @@ async def get_stream_links(
         max_results=max_results,
     ):
         total_processed += 1
-        resolution: str = TorrentMeta.parse_title(link.name).resolution
+        resolution: str = ""
+        try:
+            resolution: str = TorrentMeta.parse_title(link.name).resolution
+        except ValidationError as e:
+            log.debug("error parsing title", title=link.name, exc_info=e)
+            continue
+
         if len(resolution_links[resolution]) >= math.ceil(max_results / 2):
             log.debug("max results for resolution", resolution=resolution)
             continue
