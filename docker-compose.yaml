@@ -17,8 +17,8 @@ services:
       LOG_LEVEL: debug
       JACKETT_URL: "http://jackett:9117"
       JACKETT_API_KEY: "<Set this value from Jackett>"
-      JACKETT_MAX_RESULTS: "10" # max results from jackett search
-      JACKETT_TIMEOUT: "5" # max time spent searching per indexer.
+      JACKETT_MAX_RESULTS: "100" # max results from jackett search
+      JACKETT_TIMEOUT: "60" # max time spent searching per indexer.
       JACKETT_INDEXERS: "yts,eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,bitsearch,limetorrents,badasstorrents"
       LISTEN_PORT: "8000"
 
