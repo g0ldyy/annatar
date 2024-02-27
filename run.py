@@ -12,7 +12,7 @@ WORKERS = int(os.getenv("WORKERS", 2 * NUM_CORES))
 PROM_DIR = os.getenv(
     "PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{datetime.now().timestamp()}"
 )
-REDIS_HOST = os.environ.get("REDIS_HOST", "")
+
 
 if __name__ == "__main__":
     # setup prometheus multiprocess before anything else
@@ -20,13 +20,6 @@ if __name__ == "__main__":
     if not os.path.isdir(PROM_DIR):
         os.mkdir(PROM_DIR)
     multiprocess.MultiProcessCollector(CollectorRegistry())
-
-    redis_server = None
-    if not REDIS_HOST:
-        import redislite
-
-        redis_server = redislite.client.StrictRedis(serverconfig={"port": 6379})
-        os.environ["REDIS_HOST"] = PROM_DIR
 
     uvicorn.run(
         "annatar.main:app",
@@ -37,6 +30,3 @@ if __name__ == "__main__":
         loop="uvloop",
         log_level="error",
     )
-
-    if redis_server:
-        redis_server.close()

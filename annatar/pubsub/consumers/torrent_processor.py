@@ -82,8 +82,6 @@ async def process_movie(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: 
             score=score,
             ttl=ttl,
         )
-    else:
-        log.info("low score, not storing")
 
 
 async def process_show(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: timedelta):

@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import structlog
 from aioresponses import aioresponses
+from redislite.client import StrictRedis
 
 from annatar.database import db, odm
-from annatar.database.adaptors.aioredislite import StrictRedis
 from annatar.debrid import magnet
 from annatar.pubsub.consumers.torrent_processor import (
     process_message,
@@ -49,9 +49,10 @@ def mock_search_result(title: str) -> TorrentSearchResult:
 class map_matched_result(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
-        pass
+        db.redis.flushall()
 
     @mock.patch("annatar.torrent.TorrentMeta.match_score")
     async def test_does_not_allow_low_meta_scores(self, mock_match_score):
@@ -77,9 +78,10 @@ class map_matched_result(unittest.IsolatedAsyncioTestCase):
 class ProcessMessage(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
-        pass
+        db.redis.flushall()
 
     async def test_does_not_store_low_scores(self):
         title = "The Lord of the Rings The Return of the King 2003 1080p X265"
@@ -155,9 +157,10 @@ class ProcessMessage(unittest.IsolatedAsyncioTestCase):
 class ResolveMagnetLink(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         db.redis = StrictRedis()
+        self.assertTrue(db.redis.ping())
 
     async def asyncTearDown(self):
-        pass
+        db.redis.flushall()
 
     async def test_resolves_magnet_links(self):
         guid = uuid4().hex

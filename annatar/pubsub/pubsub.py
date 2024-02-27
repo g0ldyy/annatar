@@ -1,3 +1,4 @@
+import asyncio
 from enum import Enum
 from typing import AsyncGenerator, Type, TypeVar
 
@@ -33,12 +34,12 @@ class Topic(str, Enum):
 
 
 async def lock(key: str, timeout: int = 10) -> bool:
-    return bool(await redis.set(key, "locked", nx=True, ex=timeout))
+    return bool(redis.set(key, "locked", nx=True, ex=timeout))
 
 
 async def publish(topic: Topic, msg: str) -> int:
     REDIS_MESSAGES_PUBLISHED.labels(topic).inc()
-    return await redis.publish(topic, msg)
+    return redis.publish(topic, msg)
 
 
 async def consume_topic(topic: Topic, model: Type[T]) -> AsyncGenerator[T, None]:
@@ -48,9 +49,16 @@ async def consume_topic(topic: Topic, model: Type[T]) -> AsyncGenerator[T, None]
     """
     log.info("begin consuming topic", topic=topic)
     pubsub = redis.pubsub()
-    await pubsub.subscribe(topic)
-    async for message in pubsub.listen():
+    pubsub.subscribe(topic)
+    pubsub.listen()
+    while True:
+        # timeout because this does not support asyncio so we have to give up after
+        # some time. If this timeout is too low then this will consume all of the
+        # process time. We have to delay between empty messages caused by timeout
+        # and retrying.
+        message = pubsub.get_message(ignore_subscribe_messages=True, timeout=0.10)
         if message is None:
+            await asyncio.sleep(1)
             continue
         if message.get("type", "") != "message":
             continue
