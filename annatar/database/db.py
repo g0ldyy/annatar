@@ -7,18 +7,26 @@ from typing import Any, Callable, Coroutine, Optional, Type, TypeVar
 import structlog
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ValidationError
-from redislite.client import StrictRedis
+from redis.asyncio import StrictRedis
 
 from annatar import instrumentation
+from annatar.database.adaptors import aioredislite
 
 log = structlog.get_logger(__name__)
 
 
+REDIS_URL = os.environ.get("REDIS_URL")
 DB_PATH = os.environ.get("DB_PATH", "annatar.db")
-REDIS_URL = os.environ.get("REDIS_URL", "")
-REDIS_FLAGS = {"socket_timeout": 3.0, "socket_connect_timeout": 3.0}
-redis: StrictRedis = (
-    StrictRedis(host=REDIS_URL, **REDIS_FLAGS) if REDIS_URL else StrictRedis(DB_PATH, **REDIS_FLAGS)
+
+redis: StrictRedis | aioredislite.StrictRedis = (
+    StrictRedis(
+        host=REDIS_URL,
+        socket_timeout=3.0,
+        socket_connect_timeout=3.0,
+        retry_on_timeout=True,
+    )
+    if REDIS_URL
+    else aioredislite.StrictRedis(DB_PATH)
 )
 
 REQUEST_DURATION = Histogram(
@@ -48,7 +56,7 @@ async def measure_hits(key: str, task: Callable[[], Coroutine[None, None, T]]) -
 
 @REQUEST_DURATION.labels("PING").time()
 async def ping() -> bool:
-    redis.ping()
+    await redis.ping()
     return True
 
 
@@ -68,7 +76,7 @@ async def get_model(key: str, model: Type[TBaseModel]) -> Optional[TBaseModel]:
 
 @REQUEST_DURATION.labels("KEYS").time()
 async def list_keys(pattern: str) -> list[str]:
-    return [key.decode("utf-8") for key in redis.keys(pattern)]
+    return [key.decode("utf-8") for key in await redis.keys(pattern)]
 
 
 @REQUEST_DURATION.labels("ZADD").time()
@@ -78,7 +86,7 @@ async def unique_list_add(
     score: int = 0,
     ttl: timedelta = timedelta(0),
 ) -> bool:
-    added: int = redis.zadd(name, {item: score})
+    added: int = await redis.zadd(name, {item: score})
     if ttl.total_seconds() > 0:
         await set_ttl(name, ttl)
     return bool(added)
@@ -139,15 +147,13 @@ async def _unique_list_get_scored(
 ) -> list[ScoredItem]:
     try:
         results: dict[int, list[ScoredItem]] = defaultdict(list)
-        redis_items = redis.zrange(
+        redis_items = await redis.zrevrangebyscore(
             name=name,
-            start=max_score,
-            end=min_score,
-            desc=True,
+            start=0,
             withscores=True,
-            byscore=True,
+            max=max_score,
+            min=min_score,
             num=limit,
-            offset=0,
         )
         for i in redis_items:
             score = int(i[1])
@@ -171,7 +177,7 @@ async def set_model(key: str, model: BaseModel, ttl: timedelta) -> bool:
 @REQUEST_DURATION.labels("EXPIRE").time()
 async def set_ttl(key: str, ttl: timedelta) -> bool:
     try:
-        if redis.expire(key, time=ttl):
+        if await redis.expire(key, time=ttl):
             return True
         return False
     except Exception as e:
@@ -186,7 +192,7 @@ async def unique_count(key: str) -> int:
 @REQUEST_DURATION.labels("PFCOUNT").time()
 async def _unique_count(key: str) -> int:
     try:
-        return redis.pfcount(key)
+        return await redis.pfcount(key)
     except Exception as e:
         log.error("failed to pfcount", key=key, exc_info=e)
         return False
@@ -195,7 +201,7 @@ async def _unique_count(key: str) -> int:
 @REQUEST_DURATION.labels("PFADD").time()
 async def unique_add(key: str, value: str) -> bool:
     try:
-        res = redis.pfadd(key, value)
+        res = await redis.pfadd(key, value)
         return bool(res)
     except Exception as e:
         log.error("failed to pfadd", key=key, exc_info=e)
@@ -207,7 +213,7 @@ async def set(key: str, value: str, ttl: timedelta | None = None) -> bool:
     try:
         # ttl or None
         # TTL is sometimes already expired such as timedelta(0) but redis doesn't like that
-        return bool(redis.set(key, value, ex=ttl or None))
+        return bool(await redis.set(key, value, ex=ttl))
     except Exception as e:
         log.error("failed to set cache", key=key, exc_info=e)
         return False
@@ -220,7 +226,7 @@ async def hset(key: str, field: str, value: str) -> bool:
 
 async def _hset(key: str, field: str, value: str) -> bool:
     try:
-        return bool(redis.hset(key, field, value))
+        return bool(await redis.hset(key, field, value))
     except Exception as e:
         log.error("failed to hset cache", key=key, exc_info=e)
         return False
@@ -233,7 +239,7 @@ async def hmset(key: str, mapping: dict[Any, Any]) -> bool:
 
 async def _hmset(key: str, mapping: dict[Any, Any]) -> bool:
     try:
-        return bool(redis.hmset(key, mapping))
+        return bool(await redis.hmset(key, mapping))
     except Exception as e:
         log.error("failed to hmset cache", key=key, exc_info=e)
         return False
@@ -246,7 +252,7 @@ async def hget(key: str, field: str) -> Optional[str]:
 
 async def _hget(key: str, field: str) -> Optional[str]:
     try:
-        if res := redis.hget(key, field):
+        if res := await redis.hget(key, field):
             return res.decode("utf-8")
         return None
     except Exception as e:
@@ -261,7 +267,8 @@ async def hgetall(key: str) -> dict[str, str]:
 
 async def _hgetall(key: str) -> dict[str, str]:
     try:
-        return {k.decode("utf-8"): v.decode("utf-8") for k, v in redis.hgetall(key).items()}
+        all = await redis.hgetall(key)
+        return {k.decode("utf-8"): v.decode("utf-8") for k, v in all.items()}
     except Exception as e:
         log.error("failed to hgetall cache", key=key, exc_info=e)
         return {}
@@ -269,7 +276,7 @@ async def _hgetall(key: str) -> dict[str, str]:
 
 @REQUEST_DURATION.labels("TTL").time()
 async def ttl(key: str) -> int:
-    return redis.ttl(key)
+    return await redis.ttl(key)
 
 
 async def get(key: str) -> Optional[str]:
@@ -279,15 +286,9 @@ async def get(key: str) -> Optional[str]:
 @REQUEST_DURATION.labels("GET").time()
 async def _get(key: str) -> Optional[str]:
     try:
-        if res := redis.get(key):
+        if res := await redis.get(key):
             return res.decode("utf-8")
         return None
     except Exception as e:
         log.error("failed to get cache", key=key, exc_info=e)
         return None
-
-
-if REDIS_URL:
-    log.info("connected to redis", host=REDIS_URL)
-else:
-    log.info("running with local redis", storage=DB_PATH)

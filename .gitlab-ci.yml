@@ -22,6 +22,12 @@ services:
 lint:
   stage: test
   image: python:3.11-slim
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        paths: ['*']
+        compare_to: 'refs/heads/master'
   script:
     - apt-get update && apt-get install make
     - pip install poetry
@@ -31,6 +37,12 @@ lint:
 test:
   stage: test
   image: python:3.11-slim
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        paths: ['*']
+        compare_to: 'refs/heads/master'
   artifacts:
     reports:
       junit: report.xml
