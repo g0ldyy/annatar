@@ -48,4 +48,5 @@ class RealDebridProvider(DebridService):
             info_hash=info_hash,
             file_id=file_id,
             debrid_token=debrid_token,
+            source_ip=self.source_ip,
         )

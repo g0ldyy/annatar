@@ -24,7 +24,9 @@ Although I wrote Annatar to be self-hosted it is also available as a [Community 
 
 ## Running Locally
 
-:warning: It is important to note that the indexers you choose to search are what determines the cold speed of Annatar results. Those listed in the image below are the ones that I have had the best experience with and also provide results for almost everything I search. choose your indexers carefully. If you aren't sure which ones are fast/slow then add one and use the Manual Search button in Jackett and set the indexer in the query. If the results take forever then that's a slow indexer. :warning: 
+:warning: **IMPORTANT NOTE ABOUT REAL DEBRID**: If you are using RD you should be aware of their IP restrictions. If you stream from more than one IP at a time you will receive a warning and then a ban. The IP address tied to the stream depends on how you configure Annatar. By default Annatar will not forward the client IP address. This means that in your [RD Downloads](https://real-debrid.com/downloads) page you will see the public IP address of the Annatar server and not the client streaming the content. If you would like to forward the client IP (your phone or TV) then set the environment variable `FORWARD_ORIGIN_IP: "true"`. If you are behind a reverse proxy make sure the proxy is setting x-real-ip or x-forwarded-for headers to the origin IP address. If you want to send a static IP address you can set `OVERRIDE_ORIGIN_IP: "<some IP>"` and that will take precedence. 
+
+---
 
 **Annatar must be accessible by Stremio via HTTPS**. Run it on a desktop, VM, or server somewhere that your Stremio apps can reach it. You will need HTTPS otherwise Stremio will not install the plugin. See #1 for comments. 
 

@@ -11,8 +11,9 @@ class DebridService(ABC):
     def __str__(self) -> str:
         return self.name()
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, source_ip: str):
         self.api_key = api_key
+        self.source_ip = source_ip
 
     @abstractmethod
     def shared_cache(self) -> bool:

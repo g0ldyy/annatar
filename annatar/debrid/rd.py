@@ -97,6 +97,7 @@ async def _get_stream_for_torrent(
     info_hash: str,
     file_id: int,
     debrid_token: str,
+    source_ip: str,
 ) -> Optional[UnrestrictedLink]:
     file_set: InstantFileSet | None = await db.get_model(
         key=f"rd:instant_file_set:torrent:{info_hash.upper()}:{file_id}",
@@ -110,6 +111,7 @@ async def _get_stream_for_torrent(
     torrent_id: Optional[str] = await api.add_magnet(
         info_hash=info_hash,
         debrid_token=debrid_token,
+        source_ip=source_ip,
     )
 
     if not torrent_id:
@@ -123,6 +125,7 @@ async def _get_stream_for_torrent(
         torrent_id=torrent_id,
         debrid_token=debrid_token,
         file_ids=file_set.file_ids,
+        source_ip=source_ip,
     )
     if selected:
         log.info("Selected torrent file set", torrent_id=torrent_id, file_id=file_id)
@@ -145,6 +148,7 @@ async def _get_stream_for_torrent(
         info_hash=info_hash,
         link=torrent_link,
         debrid_token=debrid_token,
+        source_ip=source_ip,
     )
     if not unrestricted_link:
         log.info("no unrestrict link found")
@@ -158,6 +162,7 @@ async def get_stream_for_torrent(
     info_hash: str,
     file_id: int,
     debrid_token: str,
+    source_ip: str,
 ) -> Optional[StreamLink]:
     """
     Get the stream link for a torrent and file.
@@ -173,6 +178,7 @@ async def get_stream_for_torrent(
         info_hash=info_hash,
         file_id=file_id,
         debrid_token=debrid_token,
+        source_ip=source_ip,
     )
     if not unrestricted_link:
         log.info("No unrestricted link found")

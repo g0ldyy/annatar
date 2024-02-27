@@ -1,3 +1,5 @@
+import os
+from base64 import b64encode
 from enum import Enum
 from typing import Annotated, Any, Optional
 
@@ -19,6 +21,10 @@ router = APIRouter()
 log = structlog.get_logger(__name__)
 
 
+FORWARD_ORIGIN_IP = os.environ.get("FORWARD_ORIGIN_IP", "false").lower() == "true"
+OVERRIDE_ORIGIN_IP = os.environ.get("OVERRIDE_ORIGIN_IP", None)
+
+
 class MediaType(str, Enum):
     movie = "movie"
     series = "series"
@@ -37,15 +43,37 @@ async def root_redirect() -> RedirectResponse:
 
 
 @router.get("/manifest.json")
-async def get_manifst_with_config() -> dict[str, Any]:
-    return await get_manifest("")
+async def get_manifst_with_config(request: Request) -> dict[str, Any]:
+    default_config = b64encode(UserConfig.defaults().model_dump_json().encode()).decode()
+    return await get_manifest(
+        request=request,
+        b64config=default_config,
+    )
+
+
+def get_source_ip(request: Request) -> str:
+    if OVERRIDE_ORIGIN_IP:
+        return OVERRIDE_ORIGIN_IP
+
+    source_ip = ""
+
+    if request.client:
+        if FORWARD_ORIGIN_IP:
+            source_ip = request.headers.get(
+                "x-real-ip", request.headers.get("x-forwarded-for", request.client.host)
+            )
+        else:
+            source_ip = request.client.host
+    return source_ip
 
 
 @router.get("/{b64config:str}/manifest.json")
-async def get_manifest(b64config: str) -> dict[str, Any]:
+async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
     user_config: UserConfig = config.parse_config(b64config)
     debrid: Optional[DebridService] = get_provider(
-        user_config.debrid_service, user_config.debrid_api_key
+        provider_name=user_config.debrid_service,
+        api_key=user_config.debrid_api_key,
+        source_ip=get_source_ip(request),
     )
     app_name: str = config.APP_NAME
     if debrid:
@@ -86,11 +114,15 @@ async def get_hashes(
     response_model_exclude_none=True,
 )
 async def get_rd_stream(
+    request: Request,
     debrid_api_key: Annotated[str, Path(description="Debrid token")],
     info_hash: Annotated[str, Path(description="Torrent info hash")],
     file_id: Annotated[int, Path(description="ID of the file in the torrent")],
 ) -> RedirectResponse:
-    rd: RealDebridProvider = RealDebridProvider(debrid_api_key)
+    rd: RealDebridProvider = RealDebridProvider(
+        api_key=debrid_api_key,
+        source_ip=get_source_ip(request),
+    )
     stream: Optional[StreamLink] = await rd.get_stream_for_torrent(
         info_hash=info_hash,
         file_id=file_id,
@@ -122,7 +154,9 @@ async def list_streams(
 ) -> StreamResponse:
     user_config: UserConfig = config.parse_config(b64config)
     debrid: Optional[DebridService] = get_provider(
-        user_config.debrid_service, user_config.debrid_api_key
+        provider_name=user_config.debrid_service,
+        api_key=user_config.debrid_api_key,
+        source_ip=get_source_ip(request),
     )
     if not debrid:
         raise HTTPException(status_code=400, detail="Invalid debrid service")
