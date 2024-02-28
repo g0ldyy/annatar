@@ -23,7 +23,7 @@ log = structlog.get_logger(__name__)
 
 FORWARD_ORIGIN_IP = os.environ.get("FORWARD_ORIGIN_IP", "false").lower() == "true"
 OVERRIDE_ORIGIN_IP = os.environ.get("OVERRIDE_ORIGIN_IP", None)
-ORIGIN_IP_HEADER = os.environ.get("ORIGIN_IP_HEADER") or "x-real-ip"
+ORIGIN_IP_HEADER = os.environ.get("ORIGIN_IP_HEADER") or "X-Forwarded-For"
 
 
 class MediaType(str, Enum):
@@ -62,7 +62,7 @@ def get_source_ip(request: Request) -> str:
         source_ip = request.headers.get(
             ORIGIN_IP_HEADER,
             request.client.host,
-        )
+        ).split(",")[0]
     return source_ip
 
 
