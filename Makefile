@@ -27,6 +27,8 @@ container:
 		--build-arg BUILD_VERSION=$(BUILD_VERSION) \
 		$(DOCKER_PUSH) \
 		--cache-from=$(DOCKER_TAG_ARCH) \
+		--cache-from=$(DOCKER_TAG) \
+		--cache-from=$(IMAGE_NAME):latest \
 		-f $(DOCKERFILE) \
 		-t $(DOCKER_TAG_ARCH) .
 
@@ -36,6 +38,10 @@ docker-manifest:
 	docker manifest create $(DOCKER_TAG) $(foreach arch,$(ARCHS),$(DOCKER_TAG)-$(arch))
 	$(foreach arch,$(ARCHS),docker manifest annotate $(DOCKER_TAG) $(DOCKER_TAG)-$(arch) --arch $(arch) ;)
 	docker manifest push $(DOCKER_TAG)
+	# create latest tag
+	docker manifest create $(IMAGE_NAME) $(foreach arch,$(ARCHS),$(DOCKER_TAG)-$(arch))
+	$(foreach arch,$(ARCHS),docker manifest annotate $(IMAGE_NAME):latest $(DOCKER_TAG)-$(arch) --arch $(arch) ;)
+	docker manifest push $(IMAGE_NAME):latest
 
 lint:
 	poetry run ruff check annatar
