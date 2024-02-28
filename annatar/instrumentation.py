@@ -14,12 +14,16 @@ from prometheus_client import (
 
 log = structlog.get_logger()
 
+single_proc_registry = CollectorRegistry()
+
 
 def registry() -> CollectorRegistry:
-    reg = CollectorRegistry()
-    if os.getenv("PROMETHEUS_MULTIPROC_DIR", None):
+    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
+        reg = CollectorRegistry()
         multiprocess.MultiProcessCollector(reg)
-    return reg
+        return reg
+
+    return single_proc_registry
 
 
 Gauge(

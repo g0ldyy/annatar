@@ -16,10 +16,11 @@ PROM_DIR = os.getenv(
 
 if __name__ == "__main__":
     # setup prometheus multiprocess before anything else
-    os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
-    if not os.path.isdir(PROM_DIR):
-        os.mkdir(PROM_DIR)
-    multiprocess.MultiProcessCollector(CollectorRegistry())
+    if WORKERS > 1:
+        os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
+        if not os.path.isdir(PROM_DIR):
+            os.mkdir(PROM_DIR)
+        multiprocess.MultiProcessCollector(CollectorRegistry())
 
     uvicorn.run(
         "annatar.main:app",
