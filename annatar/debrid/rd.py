@@ -25,7 +25,8 @@ log = structlog.get_logger(__name__)
 
 async def find_streamable_file_id(
     files: list[TorrentFile],
-    season_episode: None | list[int] = None,
+    season: int = 0,
+    episode: int = 0,
 ) -> int | None:
     if len(files) == 0:
         log.debug("No files, returning 0")
@@ -37,22 +38,26 @@ async def find_streamable_file_id(
         return None
 
     sorted_files: list[TorrentFile] = sorted(video_files, key=lambda f: f.bytes, reverse=True)
-    if not season_episode:
+    if not season or not episode:
         log.debug("returning biggest file", file=sorted_files[0])
         return sorted_files[0].id if human.is_video(sorted_files[0].path) else None
 
     for file in sorted_files:
         path = file.path.lower()
-        if human.match_season_episode(season_episode=season_episode, file=path):
+        if human.match_season_episode(season=season, episode=episode, file=path):
             if not human.is_video(path):
                 continue
             log.info(
-                "found matched file for season/episode", file=file, season_episode=season_episode
+                "found matched file for season/episode",
+                file=file,
+                season=season,
+                episode=episode,
             )
             return file.id
     log.info(
         "No file found for season/episode",
-        season_episode=season_episode,
+        season=season,
+        episode=episode,
     )
     return None
 
@@ -196,8 +201,15 @@ async def get_stream_for_torrent(
 async def get_stream_link(
     info_hash: str,
     debrid_token: str,
-    season_episode: None | list[int] = None,
+    season: int = 0,
+    episode: int = 0,
 ) -> StreamLink | None:
+    info_hash = info_hash.upper()
+    cache_key: str = f"rd:stream_link:torrent:{info_hash}"
+    if cache := await db.get_model(cache_key, model=StreamLink):
+        log.debug("Cached stream link found", link=cache)
+        return cache
+
     async for cached_files in api.get_instant_availability(
         info_hash,
         debrid_token,
@@ -215,7 +227,8 @@ async def get_stream_link(
         ]
         file_id: int | None = await find_streamable_file_id(
             files=torrent_files,
-            season_episode=season_episode,
+            season=season,
+            episode=episode,
         )
 
         if not file_id:
@@ -236,16 +249,18 @@ async def get_stream_link(
         url: str = f"/rd/{debrid_token}/{info_hash}/{file_id}"
 
         await db.set_model(
-            key=f"rd:instant_file_set:torrent:{info_hash.upper()}:{file_id}",
+            key=f"rd:instant_file_set:torrent:{info_hash}:{file_id}",
             model=InstantFileSet(file_ids=[f.id for f in cached_files]),
             ttl=timedelta(hours=8),
         )
 
-        return StreamLink(
+        stream_link = StreamLink(
             size=file.filesize,
             name=file.filename,
             url=url,
         )
+        await db.set_model(cache_key, stream_link, ttl=timedelta(hours=8))
+        return stream_link
     return None
 
 
@@ -254,7 +269,8 @@ async def get_stream_links(
     debrid_token: str,
     stop: asyncio.Event,
     max_results: int,
-    season_episode: None | list[int] = None,
+    season: int = 0,
+    episode: int = 0,
 ) -> AsyncGenerator[StreamLink, None]:
     """
     Generates a list of RD links for each torrent link.
@@ -269,7 +285,8 @@ async def get_stream_links(
             asyncio.create_task(
                 get_stream_link(
                     info_hash=info_hash,
-                    season_episode=season_episode,
+                    season=season,
+                    episode=episode,
                     debrid_token=debrid_token,
                 )
             )

@@ -9,8 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from annatar import jackett
-from annatar.config import APP_ID, VERSION, UserConfig, parse_config
+from annatar.config import APP_ID, JACKETT_INDEXERS_LIST, VERSION, UserConfig, parse_config
 from annatar.database import db
 from annatar.debrid.providers import list_providers
 
@@ -48,8 +47,8 @@ async def configure_new(request: Request):
 
 async def configure(request: Request, config: UserConfig) -> HTMLResponse:
     indexer_datas = zip(
-        jackett.JACKETT_INDEXERS_LIST,
-        await asyncio.gather(*[get_indexer_name(n) for n in jackett.JACKETT_INDEXERS_LIST]),
+        JACKETT_INDEXERS_LIST,
+        await asyncio.gather(*[get_indexer_name(n) for n in JACKETT_INDEXERS_LIST]),
     )
     indexers: list[Indexer] = [Indexer(id=id, name=name) for id, name in indexer_datas]
     model: FormConfig = FormConfig(

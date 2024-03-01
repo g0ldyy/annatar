@@ -77,9 +77,9 @@ def find_episode(file: str) -> int | None:
     return None
 
 
-def match_season_episode(season_episode: list[int], file: str) -> bool:
-    matches_season = match_season(season_episode[0], file)
-    matches_episode = match_episode(season_episode[1], file)
+def match_season_episode(season: int, episode: int, file: str) -> bool:
+    matches_season = match_season(season, file)
+    matches_episode = match_episode(episode, file)
 
     log.debug(
         "pattern match result",

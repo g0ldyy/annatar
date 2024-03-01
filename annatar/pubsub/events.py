@@ -1,4 +1,5 @@
-from typing import Any, AsyncGenerator, TypeVar
+import asyncio
+from typing import Any, TypeVar
 
 import structlog
 from pydantic import BaseModel, field_validator
@@ -10,6 +11,28 @@ from annatar.torrent import Category
 log = structlog.get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+
+class SearchRequest(BaseModel):
+    imdb: str
+    year: int
+    query: str
+    season: int
+    episode: int
+    category: Category
+
+    @staticmethod
+    async def listen(queue: asyncio.Queue["SearchRequest"], consumer: str):
+        await pubsub.consume_topic(
+            topic=Topic.SearchRequest,
+            model=SearchRequest,
+            queue=queue,
+            consumer=consumer,
+        )
+
+    @staticmethod
+    async def publish(result: "SearchRequest") -> int:
+        return await pubsub.publish(Topic.SearchRequest, result.model_dump_json())
 
 
 class TorrentSearchCriteria(BaseModel):
@@ -24,7 +47,7 @@ class TorrentSearchCriteria(BaseModel):
 class TorrentSearchResult(BaseModel):
     search_criteria: TorrentSearchCriteria
     category: list[int] = []
-    info_hash: str
+    info_hash: str = ""
     title: str
     guid: str
     imdb: str = ""
@@ -47,12 +70,13 @@ class TorrentSearchResult(BaseModel):
         return v
 
     @staticmethod
-    async def listen() -> AsyncGenerator["TorrentSearchResult", None]:
-        async for item in pubsub.consume_topic(
+    async def listen(queue: asyncio.Queue["TorrentSearchResult"], consumer: str):
+        await pubsub.consume_topic(
             topic=Topic.TorrentSearchResult,
             model=TorrentSearchResult,
-        ):
-            yield item
+            queue=queue,
+            consumer=consumer,
+        )
 
     @staticmethod
     async def publish(result: "TorrentSearchResult") -> int:
@@ -67,12 +91,13 @@ class TorrentAdded(BaseModel):
     episode: int | None = None
 
     @staticmethod
-    async def listen() -> AsyncGenerator["TorrentAdded", None]:
-        async for item in pubsub.consume_topic(
+    async def listen(queue: asyncio.Queue["TorrentAdded"], consumer: str):
+        await pubsub.consume_topic(
             topic=Topic.TorrentAdded,
             model=TorrentAdded,
-        ):
-            yield item
+            queue=queue,
+            consumer=consumer,
+        )
 
     @staticmethod
     async def publish(result: "TorrentAdded") -> int:

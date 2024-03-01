@@ -1,9 +1,9 @@
 import asyncio
 from enum import Enum
-from typing import AsyncGenerator, Type, TypeVar
+from typing import Type, TypeVar
 
 import structlog
-from prometheus_client import Counter
+from prometheus_client import Counter, Gauge
 from pydantic import BaseModel
 
 from annatar import instrumentation
@@ -31,10 +31,10 @@ REDIS_MESSAGES_PUBLISHED = Counter(
 class Topic(str, Enum):
     TorrentSearchResult = "events:v1:torrent:search_result"
     TorrentAdded = "events:v1:torrent:added"
+    SearchRequest = "events:v1:search:request"
 
-
-async def lock(key: str, timeout: int = 10) -> bool:
-    return bool(redis.set(key, "locked", nx=True, ex=timeout))
+    def __str__(self):
+        return self.value
 
 
 async def publish(topic: Topic, msg: str) -> int:
@@ -42,7 +42,12 @@ async def publish(topic: Topic, msg: str) -> int:
     return redis.publish(topic, msg)
 
 
-async def consume_topic(topic: Topic, model: Type[T]) -> AsyncGenerator[T, None]:
+async def consume_topic(
+    topic: Topic,
+    queue: asyncio.Queue[T],
+    model: Type[T],
+    consumer: str,
+):
     """
     Consume a topic indefinitely. If timeout is set then consumption will end
     if nothing has been received for the duration of the timeout.
@@ -51,6 +56,11 @@ async def consume_topic(topic: Topic, model: Type[T]) -> AsyncGenerator[T, None]
     pubsub = redis.pubsub()
     pubsub.subscribe(topic)
     pubsub.listen()
+    queue_depth: Gauge = instrumentation.QUEUE_DEPTH.labels(
+        queue=topic,
+        consumer=consumer,
+        maxdepth=queue.maxsize,
+    )
     while True:
         # timeout because this does not support asyncio so we have to give up after
         # some time. If this timeout is too low then this will consume all of the
@@ -64,8 +74,12 @@ async def consume_topic(topic: Topic, model: Type[T]) -> AsyncGenerator[T, None]
             continue
         data = message.get("data", {})
         try:
-            yield model.model_validate_json(data)
+            await queue.put(model.model_validate_json(data))
             REDIS_MESSAGES_CONSUMED.labels(topic).inc()
+            queue_depth.set(queue.qsize())
+        except asyncio.QueueFull:
+            log.error("queue is overflowing", topic=topic)
+            continue
         except Exception as e:
             log.error(
                 "failed to deserialize message from queue",

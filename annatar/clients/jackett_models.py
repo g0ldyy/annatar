@@ -53,5 +53,15 @@ class SearchResult(BaseModel):
     MagnetUri: Optional[str] = None
 
 
-class SearchResults(BaseModel):
+class Indexer(BaseModel):
+    ID: str
+    Name: str
+    Status: int
+    Results: int
+    Error: Optional[str] = None
+
+
+class SearchResponse(BaseModel):
     Results: list[SearchResult] = []
+    Indexers: list[Indexer] = []
+    cached: bool = False

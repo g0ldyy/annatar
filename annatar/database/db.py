@@ -1,6 +1,7 @@
 import os
 import sys
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Optional, Type, TypeVar
 
@@ -285,6 +286,22 @@ async def _get(key: str) -> Optional[str]:
     except Exception as e:
         log.error("failed to get cache", key=key, exc_info=e)
         return None
+
+
+async def try_lock(key: str, timeout: timedelta | int = 10) -> bool:
+    return bool(redis.set(key, "locked", nx=True, ex=timeout))
+
+
+async def unlock(key: str) -> bool:
+    return bool(redis.delete(key))
+
+
+@contextmanager
+def lock(key: str):
+    try:
+        yield redis.set(key, "locked", nx=True, ex=300)
+    finally:
+        redis.delete(key)
 
 
 if REDIS_URL:

@@ -35,8 +35,9 @@ class DebridService(ABC):
     async def get_stream_links(
         self,
         torrents: list[str],
-        season_episode: list[int],
         stop: asyncio.Event,
         max_results: int,
+        season: int = 0,
+        episode: int = 0,
     ) -> AsyncGenerator[StreamLink, None]:
         ...

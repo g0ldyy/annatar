@@ -5,9 +5,11 @@ from itertools import product
 
 import aiohttp
 import structlog
+from prometheus_client import Gauge
 
 from annatar.database import db, odm
 from annatar.debrid import magnet
+from annatar.instrumentation import QUEUE_DEPTH
 from annatar.pubsub import pubsub
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, Torrent, TorrentMeta
@@ -15,7 +17,7 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 log = structlog.get_logger(__name__)
 
 MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
-TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "100"))
+TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "10000"))
 
 
 class TorrentProcessor:
@@ -24,32 +26,41 @@ class TorrentProcessor:
         queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
             maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
         )
+        queue_depth = QUEUE_DEPTH.labels(
+            queue=pubsub.Topic.TorrentSearchResult,
+            consumer="torrent_processor",
+            maxdepth=queue.maxsize,
+        )
         workers = [
-            asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
+            asyncio.create_task(process_queue(queue, queue_depth), name=f"torrent_processor_{i}")
             for i in range(num_workers)
-        ]
-        async for result in TorrentSearchResult.listen():
-            if not result:
-                continue
-            if not await pubsub.lock(f"lock:torrent_processor:{result.guid}"):
-                continue
-            log.debug("received torrent", torrent=result.info_hash or result.guid)
-            await queue.put(result)
+        ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
+
+        await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
 
         for w in workers:
             if not w.done():
                 w.cancel()
 
 
-async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
+async def process_queue(queue: asyncio.Queue[TorrentSearchResult], queue_depth: Gauge):
     while True:
         result: TorrentSearchResult = await queue.get()
         if not result:
             continue
-        log.debug("processing torrent", torrent=result.info_hash or result.guid)
-        await process_message(result)
-        log.debug("finished processing torrent", torrent=result.info_hash or result.guid)
-        queue.task_done()
+        try:
+            if await db.try_lock(
+                f"lock:torrent_processor:{result.guid}", timeout=timedelta(minutes=60)
+            ):
+                log.debug("processing torrent", torrent=result.info_hash or result.guid)
+                await process_message(result)
+                log.debug("finished processing torrent", torrent=result.info_hash or result.guid)
+        except asyncio.exceptions.CancelledError:
+            break
+        finally:
+            if result:
+                queue.task_done()
+                queue_depth.dec()
 
 
 async def process_message(result: TorrentSearchResult):

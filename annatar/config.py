@@ -5,11 +5,13 @@ import structlog
 from pydantic import BaseModel
 
 log = structlog.get_logger()
+DEFAULT_INDEXERS = "yts,eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,bitsearch,limetorrents,badasstorrents"
 
 APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
 APP_NAME = os.getenv("APP_NAME", "Annatar")
 ENV = os.getenv("ENV", "dev")
 VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
+JACKETT_INDEXERS_LIST = (os.getenv("JACKETT_INDEXERS") or DEFAULT_INDEXERS).split(",")
 
 
 class UserConfig(BaseModel):

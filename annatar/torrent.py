@@ -3,7 +3,10 @@ from enum import Enum
 from typing import Any
 
 import PTN
+import structlog
 from pydantic import BaseModel, field_validator
+
+log = structlog.get_logger(__name__)
 
 # Space required for values
 # 1 bit:  2 values  (0 to 1) # good for boolean flags like HDR or Year
@@ -32,6 +35,14 @@ RESOLUTION_SCORES = {
 RESOLUTION_BITS_LENGTH = 3
 
 
+def max_resolution_score(resolution: str) -> int:
+    return (score_resolution(resolution) + 1 << RESOLUTION_BIT_POS) - 1
+
+
+def min_resolution_score(resolution: str) -> int:
+    return score_resolution(resolution) << RESOLUTION_BIT_POS
+
+
 def score_resolution(resolution: str) -> int:
     """
     Gives the resolution a score between 0 and (RESOLUTION_BITS_LENGTH^2)-1
@@ -54,6 +65,13 @@ def get_resolution(score: int) -> str:
 class Category(str, Enum):
     Movie = "movie"
     Series = "series"
+
+    def id(self) -> int:
+        if self == Category.Movie:
+            return 2000
+        if self == Category.Series:
+            return 5000
+        return 0
 
 
 class TorrentMeta(BaseModel):
@@ -80,6 +98,9 @@ class TorrentMeta(BaseModel):
     def standardize_resolution(cls: Any, v: Any):
         if v is None:
             return ""
+        if isinstance(v, bytes):
+            v = v.decode("utf-8")
+
         if isinstance(v, str):
             if v.lower() == "1440p":
                 return "QHD"

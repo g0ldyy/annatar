@@ -26,6 +26,15 @@ def registry() -> CollectorRegistry:
     return single_proc_registry
 
 
+QUEUE_DEPTH = Gauge(
+    name="queue_depth",
+    documentation="Queue depth",
+    multiprocess_mode="liveall",
+    labelnames=["queue", "consumer", "maxdepth"],
+    registry=registry(),
+)
+
+
 Gauge(
     name="build_info",
     documentation="build information",

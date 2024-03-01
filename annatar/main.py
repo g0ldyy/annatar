@@ -1,5 +1,3 @@
-import asyncio
-import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -10,7 +8,6 @@ from fastapi.staticfiles import StaticFiles
 
 from annatar import instrumentation, logging, middleware, web
 from annatar.api import stremio
-from annatar.pubsub.consumers.torrent_processor import TorrentProcessor
 
 logging.init()
 instrumentation.init()
@@ -20,15 +17,7 @@ log = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    log.info("starting torrent processors")
-    concurrency = int(os.getenv("TORRENT_PROCESSING_CONCURRENCY", "2"))
-    worker_tasks = [
-        asyncio.create_task(TorrentProcessor.run(), name=f"torrent_processor_{i}")
-        for i in range(concurrency)
-    ]
     yield
-    log.info("cancelling torrent processors")
-    all(t.cancel() for t in worker_tasks if not t.done())
     log.info("shutting down")
 
 

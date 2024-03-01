@@ -9,9 +9,9 @@ from datetime import timedelta
 
 import structlog
 
+from annatar import torrent
 from annatar.database import db
 from annatar.pubsub.events import TorrentAdded
-from annatar.torrent import get_resolution
 
 log = structlog.get_logger(__name__)
 
@@ -67,29 +67,24 @@ async def add_torrent(
 
 async def list_torrents(
     imdb: str,
-    min_score: int = 0,
     limit: int = sys.maxsize,
     season: int | None = None,
     episode: int | None = None,
     resolutions: list[str] | None = None,
 ) -> list[str]:
     keys = set([Keys.torrents(imdb, season, episode), Keys.torrents(imdb, season)])
-    results: set[str] = set()
-    log.debug("looking up torrents", keys=keys)
+    log.debug("looking up torrents", keys=keys, limit=limit)
+    results: list[db.ScoredItem] = []
     for key in keys:
-        items: list[db.ScoredItem] = await db.unique_list_get_scored(
-            name=key,
-            min_score=min_score,
-            limit=limit - len(results),
-        )
-        for item in items:
-            if resolutions:
-                torrent_resolution = get_resolution(item.score)
-                if torrent_resolution and torrent_resolution not in resolutions:
-                    continue
-            results.add(item.value)
+        for item in await db.unique_list_get_scored(name=key):
+            if resolutions and torrent.get_resolution(item.score) not in resolutions:
+                continue
+            results.append(item)
+            if len(results) >= limit:
+                break
+
     log.info("found torrents", count=len(results))
-    return list(results)
+    return list([item.value for item in sorted(results, key=lambda x: x.score, reverse=True)])
 
 
 async def set_torrent_title(info_hash: str, title: str) -> bool:

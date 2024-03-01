@@ -25,16 +25,18 @@ class RealDebridProvider(DebridService):
     async def get_stream_links(
         self,
         torrents: list[str],
-        season_episode: list[int],
         stop: asyncio.Event,
         max_results: int,
+        season: int = 0,
+        episode: int = 0,
     ) -> AsyncGenerator[StreamLink, None]:
         async for sl in rd.get_stream_links(
             torrents=torrents,
             debrid_token=self.api_key,
-            season_episode=season_episode,
             stop=stop,
             max_results=max_results,
+            season=season,
+            episode=episode,
         ):
             yield sl
 
