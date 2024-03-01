@@ -23,7 +23,8 @@ async def select_stream_file(
     if not season or not episode:
         """No season_episode is provided, return the biggest file"""
         f: DirectDL = sorted_files[0]
-        return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
+        if human.is_video(f.path):
+            return StreamLink(name=f.path.split("/")[-1], size=f.size, url=f.link)
 
     for file in sorted_files:
         if not human.is_video(file.path):
