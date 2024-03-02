@@ -206,6 +206,8 @@ async def get_stream_link(
 ) -> StreamLink | None:
     info_hash = info_hash.upper()
     cache_key: str = f"rd:stream_link:torrent:{info_hash}"
+    if season and episode:
+        cache_key += f":{season}:{episode}"
     if cache := await db.get_model(cache_key, model=StreamLink):
         log.debug("Cached stream link found", link=cache)
         return cache
