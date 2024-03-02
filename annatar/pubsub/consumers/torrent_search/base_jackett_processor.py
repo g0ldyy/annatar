@@ -5,6 +5,7 @@ import structlog
 from pydantic import BaseModel
 
 from annatar.clients import jackett
+from annatar.clients.cinemeta import MediaInfo, get_media_info
 from annatar.clients.jackett_models import SearchResponse, SearchResult
 from annatar.database import db
 from annatar.pubsub.events import SearchRequest, TorrentSearchCriteria, TorrentSearchResult
@@ -47,12 +48,19 @@ class BaseJackettProcessor(BaseModel):
                 key = f"{self.indexer}-search-processor-{request.imdb}"
                 if not await db.try_lock(key, jackett.JACKETT_CACHE_MINUTES):
                     continue
-                await process_message(self, request)
+                media_info = await get_media_info(request.imdb, request.category)
+                if not media_info:
+                    continue
+                await process_message(self, request, media_info)
             except asyncio.CancelledError:
                 return
 
 
-async def process_message(processor: BaseJackettProcessor, request: SearchRequest):
+async def process_message(
+    processor: BaseJackettProcessor,
+    request: SearchRequest,
+    media_info: MediaInfo,
+):
     log.debug("processing search request", request=request, indexer=processor.indexer)
     results: SearchResponse = SearchResponse()
     if processor.supports_imdb:
@@ -65,7 +73,7 @@ async def process_message(processor: BaseJackettProcessor, request: SearchReques
 
     if not results.Results:
         results = await jackett.search(
-            query=request.query,
+            query=media_info.name,
             indexers=[processor.indexer],
             category=request.category,
             timeout=JACKETT_TIMEOUT,
@@ -74,10 +82,12 @@ async def process_message(processor: BaseJackettProcessor, request: SearchReques
     log.debug("jackett search completed", request=len(results.Results))
 
     for result in results.Results[:JACKETT_MAX_RESULTS]:
-        await publish_search_result(request, result)
+        await publish_search_result(request, result, media_info)
 
 
-async def publish_search_result(request: SearchRequest, result: SearchResult):
+async def publish_search_result(
+    request: SearchRequest, result: SearchResult, media_info: MediaInfo
+):
     await TorrentSearchResult.publish(
         TorrentSearchResult(
             title=result.Title,
@@ -87,10 +97,8 @@ async def publish_search_result(request: SearchRequest, result: SearchResult):
             search_criteria=TorrentSearchCriteria(
                 category=request.category,
                 imdb=request.imdb,
-                season=request.season,
-                episode=request.episode,
-                query=request.query,
-                year=request.year,
+                query=media_info.name,
+                year=media_info.release_year or 0,
             ),
         )
     )

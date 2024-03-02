@@ -56,4 +56,6 @@ COPY run.py /app/run.py
 ARG BUILD_VERSION=UNKNOWN
 ENV BUILD_VERSION=${BUILD_VERSION}
 
-CMD ["python", "run.py"]
+COPY entrypoint.sh /app/entrypoint.sh
+
+CMD ["sh", "/app/entrypoint.sh"]

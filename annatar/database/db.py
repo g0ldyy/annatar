@@ -1,7 +1,6 @@
 import os
 import sys
 from collections import defaultdict
-from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Optional, Type, TypeVar
 
@@ -11,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 from redislite.client import StrictRedis
 
 from annatar import instrumentation
+from annatar.database.lock import AsyncLockManager
 
 log = structlog.get_logger(__name__)
 
@@ -296,12 +296,8 @@ async def unlock(key: str) -> bool:
     return bool(redis.delete(key))
 
 
-@contextmanager
-def lock(key: str):
-    try:
-        yield redis.set(key, "locked", nx=True, ex=300)
-    finally:
-        redis.delete(key)
+async def lock(key: str) -> AsyncLockManager:
+    return AsyncLockManager(redis, key)
 
 
 if REDIS_URL:

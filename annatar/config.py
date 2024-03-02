@@ -1,5 +1,6 @@
 import os
 from base64 import b64decode
+from datetime import datetime
 
 import structlog
 from pydantic import BaseModel
@@ -7,11 +8,18 @@ from pydantic import BaseModel
 log = structlog.get_logger()
 DEFAULT_INDEXERS = "yts,eztv,kickasstorrents-ws,thepiratebay,therarbg,torrentgalaxy,bitsearch,limetorrents,badasstorrents"
 
+
 APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
 APP_NAME = os.getenv("APP_NAME", "Annatar")
+BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
 ENV = os.getenv("ENV", "dev")
-VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
+HOST: str = os.getenv("LISTEN_HOST", "0.0.0.0")
 JACKETT_INDEXERS_LIST = (os.getenv("JACKETT_INDEXERS") or DEFAULT_INDEXERS).split(",")
+PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
+PROM_DIR = os.getenv(
+    "PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{datetime.now().timestamp()}"
+)
+VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
 
 
 class UserConfig(BaseModel):

@@ -29,7 +29,7 @@ def registry() -> CollectorRegistry:
 QUEUE_DEPTH = Gauge(
     name="queue_depth",
     documentation="Queue depth",
-    multiprocess_mode="liveall",
+    multiprocess_mode="livesum",
     labelnames=["queue", "consumer", "maxdepth"],
     registry=registry(),
 )
@@ -68,4 +68,4 @@ def init():
 
 def shutdown():
     log.info("shutdown prometheus multiprocess_mode")
-    multiprocess.mark_process_dead(os.getpid())  # type: ignore
+    multiprocess.mark_process_dead(os.getpid())

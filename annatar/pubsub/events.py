@@ -15,10 +15,6 @@ T = TypeVar("T", bound=BaseModel)
 
 class SearchRequest(BaseModel):
     imdb: str
-    year: int
-    query: str
-    season: int
-    episode: int
     category: Category
 
     @staticmethod
@@ -31,17 +27,15 @@ class SearchRequest(BaseModel):
         )
 
     @staticmethod
-    async def publish(result: "SearchRequest") -> int:
-        return await pubsub.publish(Topic.SearchRequest, result.model_dump_json())
+    async def publish(request: "SearchRequest") -> int:
+        return await pubsub.publish(Topic.SearchRequest, request.model_dump_json())
 
 
 class TorrentSearchCriteria(BaseModel):
     imdb: str
-    year: int
     query: str
-    season: int
-    episode: int
     category: Category
+    year: int = 0
 
 
 class TorrentSearchResult(BaseModel):

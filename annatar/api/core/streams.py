@@ -1,17 +1,14 @@
 import asyncio
 import math
-import re
 from collections import defaultdict
 from datetime import timedelta
 from itertools import chain
-from typing import Optional
 
 import structlog
 from prometheus_client import Counter, Histogram
 from pydantic import ValidationError
 
 from annatar import human, instrumentation
-from annatar.clients.cinemeta import MediaInfo, get_media_info
 from annatar.database import db, odm
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
@@ -42,19 +39,9 @@ async def _search(
         log.debug("unique search")
         UNIQUE_SEARCHES.inc()
 
-    media_info: Optional[MediaInfo] = await get_media_info(id=imdb_id, type=type)
-    if not media_info:
-        log.error("error getting media info", type=type, id=imdb_id)
-        return StreamResponse(streams=[], error="Error getting media info")
-    log.info("found media info", type=type, id=id, media_info=media_info.model_dump())
-
     await events.SearchRequest.publish(
         events.SearchRequest(
             imdb=imdb_id,
-            year=int(re.split(r"\D", (media_info.releaseInfo or ""))[0]),
-            query=media_info.name,
-            season=season_episode[0] if len(season_episode) == 2 else 0,
-            episode=season_episode[1] if len(season_episode) == 2 else 0,
             category=Category(type),
         )
     )

@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from annatar import instrumentation, logging, middleware, web
-from annatar.api import stremio
+from annatar.api import search, stremio
 
 logging.init()
 instrumentation.init()
@@ -18,6 +18,7 @@ log = structlog.get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     yield
+    instrumentation.shutdown()
     log.info("shutting down")
 
 
@@ -57,4 +58,5 @@ async def add_CORS_header(request: Request, call_next: Any):
 
 
 app.include_router(stremio.router)
+app.include_router(search.router)
 app.include_router(web.router)

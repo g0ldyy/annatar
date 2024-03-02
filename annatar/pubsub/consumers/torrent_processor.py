@@ -5,12 +5,9 @@ from itertools import product
 
 import aiohttp
 import structlog
-from prometheus_client import Gauge
 
 from annatar.database import db, odm
 from annatar.debrid import magnet
-from annatar.instrumentation import QUEUE_DEPTH
-from annatar.pubsub import pubsub
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, Torrent, TorrentMeta
 
@@ -26,13 +23,8 @@ class TorrentProcessor:
         queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
             maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
         )
-        queue_depth = QUEUE_DEPTH.labels(
-            queue=pubsub.Topic.TorrentSearchResult,
-            consumer="torrent_processor",
-            maxdepth=queue.maxsize,
-        )
         workers = [
-            asyncio.create_task(process_queue(queue, queue_depth), name=f"torrent_processor_{i}")
+            asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
             for i in range(num_workers)
         ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
 
@@ -43,7 +35,7 @@ class TorrentProcessor:
                 w.cancel()
 
 
-async def process_queue(queue: asyncio.Queue[TorrentSearchResult], queue_depth: Gauge):
+async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
     while True:
         result: TorrentSearchResult = await queue.get()
         if not result:
@@ -60,7 +52,6 @@ async def process_queue(queue: asyncio.Queue[TorrentSearchResult], queue_depth: 
         finally:
             if result:
                 queue.task_done()
-                queue_depth.dec()
 
 
 async def process_message(result: TorrentSearchResult):

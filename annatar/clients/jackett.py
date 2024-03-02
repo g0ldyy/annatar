@@ -71,7 +71,9 @@ async def search_imdb(
         error = e
         return SearchResponse()
     finally:
-        REQUEST_DURATION.labels(method="indexer_search", indexer=indexers, error=error).observe(
+        REQUEST_DURATION.labels(
+            method="indexer_search", indexer=",".join(indexers), error=error
+        ).observe(
             amount=(datetime.now() - start_time).total_seconds(),
         )
 
@@ -93,7 +95,7 @@ async def search(
         "Tracker[]": ",".join(indexers),
     }
 
-    log.debug("searching jackett", indexers=indexers, query=query)
+    log.debug("searching jackett", indexers=",".join(indexers), query=query)
     start_time = datetime.now()
     error = None
     try:
@@ -111,7 +113,9 @@ async def search(
         error = e
         return SearchResponse()
     finally:
-        REQUEST_DURATION.labels(method="indexer_search", indexer=indexers, error=error).observe(
+        REQUEST_DURATION.labels(
+            method="indexer_search", indexer=",".join(indexers), error=error
+        ).observe(
             amount=(datetime.now() - start_time).total_seconds(),
         )
 

@@ -66,12 +66,15 @@ class Category(str, Enum):
     Movie = "movie"
     Series = "series"
 
+    def __str__(self) -> str:
+        return self.value
+
     def id(self) -> int:
         if self == Category.Movie:
             return 2000
         if self == Category.Series:
             return 5000
-        return 0
+        raise ValueError(f"Unknown category {self}")
 
 
 class TorrentMeta(BaseModel):

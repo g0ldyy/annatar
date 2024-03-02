@@ -1,25 +1,24 @@
 import asyncio
 import os
 import threading
-from datetime import datetime
 
 import uvicorn
 from prometheus_client import CollectorRegistry, multiprocess
 
-from annatar import config
+from annatar import config, instrumentation
 from annatar.logging import init as init_logging
 from annatar.torrent import Category
 
-NUM_CORES: int = os.cpu_count() or 1
-BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
-HOST: str = os.getenv("LISTEN_HOST", "0.0.0.0")
-PORT: int = int(os.getenv("LISTEN_PORT", "8000"))
-WORKERS = int(os.getenv("WORKERS") or 2 * NUM_CORES)
-PROM_DIR = os.getenv(
-    "PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{datetime.now().timestamp()}"
-)
-
+instrumentation.init()
 init_logging()
+
+NUM_CORES: int = os.cpu_count() or 1
+WORKERS = int(os.getenv("WORKERS") or 2 * NUM_CORES)
+
+
+# setup prometheus multiprocess before anything else
+if WORKERS > 1:
+    multiprocess.MultiProcessCollector(CollectorRegistry())
 
 
 def start_torrent_processor(worker_id: int) -> None:
@@ -50,13 +49,6 @@ def start_search_processor(indexer: str, worker_id: int) -> None:
 
 
 if __name__ == "__main__":
-    # setup prometheus multiprocess before anything else
-    if WORKERS > 1:
-        os.environ["PROMETHEUS_MULTIPROC_DIR"] = PROM_DIR
-        if not os.path.isdir(PROM_DIR):
-            os.mkdir(PROM_DIR)
-        multiprocess.MultiProcessCollector(CollectorRegistry())
-
     # Start Redis processor threads
     for worker_id in range(WORKERS):
         thread: threading.Thread = threading.Thread(
@@ -78,8 +70,8 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "annatar.main:app",
-        host=HOST,
-        port=PORT,
+        host=config.HOST,
+        port=config.PORT,
         reload=False,
         workers=WORKERS,
         loop="uvloop",

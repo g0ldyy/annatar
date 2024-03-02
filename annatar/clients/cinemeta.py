@@ -1,3 +1,5 @@
+import asyncio
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -34,6 +36,20 @@ class MediaInfo(BaseModel):
     country: Optional[str] = None
     awards: Optional[str] = None
     website: Optional[str] = None
+
+    @property
+    def release_year(self) -> int | None:
+        if not self.releaseInfo:
+            return None
+
+        # you'd think to split on - but you'd be wrong because cinemeta uses
+        # an en-dash instead of a hyphen. Splitting on \D works for both cases
+        if match := re.split(r"\D", self.releaseInfo):
+            try:
+                return int(match.pop())
+            except ValueError:
+                return None
+        return None
 
 
 async def _get_media_info(id: str, type: str) -> MediaInfo | None:
@@ -77,17 +93,19 @@ async def _get_media_info(id: str, type: str) -> MediaInfo | None:
 async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
     cache_key = f"cinemeta:{type}:{id}"
 
-    cached_result: Optional[MediaInfo] = await db.get_model(cache_key, model=MediaInfo)
-    if cached_result:
-        return cached_result
+    async with await db.lock(f"{cache_key}:lock"):
+        cached_result: Optional[MediaInfo] = await db.get_model(cache_key, model=MediaInfo)
+        if cached_result:
+            return cached_result
+        await asyncio.sleep(0.1)
 
-    res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
-    if res is None:
-        return None
+        res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
+        if res is None:
+            return None
 
-    await db.set(
-        cache_key,
-        res.model_dump_json(),
-        ttl=timedelta(days=30),
-    )
-    return res
+        await db.set(
+            cache_key,
+            res.model_dump_json(),
+            ttl=timedelta(days=30),
+        )
+        return res

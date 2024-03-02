@@ -66,6 +66,7 @@ async def consume_topic(
         # some time. If this timeout is too low then this will consume all of the
         # process time. We have to delay between empty messages caused by timeout
         # and retrying.
+        queue_depth.set(queue.qsize())
         message = pubsub.get_message(ignore_subscribe_messages=True, timeout=0.10)
         if message is None:
             await asyncio.sleep(1)
@@ -76,7 +77,6 @@ async def consume_topic(
         try:
             await queue.put(model.model_validate_json(data))
             REDIS_MESSAGES_CONSUMED.labels(topic).inc()
-            queue_depth.set(queue.qsize())
         except asyncio.QueueFull:
             log.error("queue is overflowing", topic=topic)
             continue

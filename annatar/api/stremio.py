@@ -86,6 +86,7 @@ async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
         "resources": ["stream"],
         "types": MediaType.all(),
         "name": app_name,
+        "logo": "https://i.imgur.com/p4V821B.png",
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
             "configurable": True,
