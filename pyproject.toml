@@ -28,6 +28,7 @@ types-redis = "^4.6.0.20240106"
 aioresponses = "^0.7.6"
 pytest-cov = "^4.1.0"
 pytest-watcher = "^0.4.1"
+httpx = "^0.27.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -84,6 +85,9 @@ case-sensitive = true
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
 log_cli_level = "CRITICAL"
-testpaths = ["tests"]
-addopts = "-v --durations=0"
+testpaths = ["tests", "annatar"]
+addopts = "-v --durations=0 -m 'not integration'"
 cache_dir = ".cache/pytest_cache"
+markers = [
+    "integration: mark test as an integration test to run separately."
+]
