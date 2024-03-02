@@ -20,6 +20,7 @@ PROM_DIR = os.getenv(
     "PROMETHEUS_MULTIPROC_DIR", f"/tmp/annatar.metrics-{datetime.now().timestamp()}"
 )
 VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
+TORRENT_TITLE_MATCH_THRESHOLD = float(os.getenv("TORRENT_TITLE_MATCH_THRESHOLD") or 0.85)
 
 
 class UserConfig(BaseModel):

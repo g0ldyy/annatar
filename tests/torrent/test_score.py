@@ -14,21 +14,29 @@ class SearchQuery(BaseModel):
 
 class TestNameMatches(unittest.TestCase):
     def test_name_matches_when_random_non_words_are_in_the_title(self):
-        title = "F.r.iends? S01-S10 COMPLETE 4k"
-        result = Torrent.parse_title(title=title).matches_name(title="Friends")
-        self.assertTrue(result)
+        wanted = "Friends"
+        title = "Friends? S01-S10 COMPLETE 4k"
+        result = Torrent.parse_title(title=title).matches_name(title=wanted)
+        self.assertTrue(result, f"{title} should match {wanted}")
 
     def test_name_does_not_match(self):
+        wanted = "Just Friends"
         titles = [
-            "Just Friends (2005)",
-            "We Are Friends",
-            "Friends of Friends",
-            "Friends with Benefits",
+            "Just Pals 2005 Comedy HD",
+            "Jesting Friends 2005 720p BRRip",
+            "Just Fr1ends Romantic 2005 DVDrip",
+            "Gusted Friends 2005 1080p BluRay",
+            "Just Friends of Friends 2005 WebDL 1080p",
+            "Just Frenz 2005 Comedy HDRip",
+            "Juxtoppo Friends 2005 4K UHD",
+            "Just Buds 2005 Comedy 720p MKV",
+            "Just Amigos 2005 FullHD 1080p",
+            "Just Scarry Fiends 2005 Horror 720p",
         ]
 
-        for title in titles:
-            result = Torrent.parse_title(title=title).matches_name(title="Friends")
-            self.assertFalse(result)
+        for i, title in enumerate(titles):
+            result = Torrent.parse_title(title=title).matches_name(title=wanted)
+            self.assertFalse(result, f"test({i}) {title} should not match {wanted}")
 
     def test_name_matches_typos(self):
         title = "Freinds S01-S10 COMPLETE 4k"

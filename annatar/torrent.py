@@ -6,6 +6,8 @@ import PTN
 import structlog
 from pydantic import BaseModel, field_validator
 
+from annatar import config
+
 log = structlog.get_logger(__name__)
 
 # Space required for values
@@ -195,7 +197,10 @@ class TorrentMeta(BaseModel):
         return -1
 
     def matches_name(self, title: str) -> bool:
-        return Levenshtein.ratio(self.title.lower(), title.lower()) > 0.8
+        return (
+            Levenshtein.ratio(self.title.lower(), title.lower())
+            >= config.TORRENT_TITLE_MATCH_THRESHOLD
+        )
 
     @property
     def score(self):
