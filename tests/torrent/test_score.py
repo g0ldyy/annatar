@@ -12,6 +12,35 @@ class SearchQuery(BaseModel):
     episode: int = 0
 
 
+class TestNameMatches(unittest.TestCase):
+    def test_name_matches_when_random_non_words_are_in_the_title(self):
+        title = "F.r.iends? S01-S10 COMPLETE 4k"
+        result = Torrent.parse_title(title=title).matches_name(title="Friends")
+        self.assertTrue(result)
+
+    def test_name_does_not_match(self):
+        titles = [
+            "Just Friends (2005)",
+            "We Are Friends",
+            "Friends of Friends",
+            "Friends with Benefits",
+        ]
+
+        for title in titles:
+            result = Torrent.parse_title(title=title).matches_name(title="Friends")
+            self.assertFalse(result)
+
+    def test_name_matches_typos(self):
+        title = "Freinds S01-S10 COMPLETE 4k"
+        result = Torrent.parse_title(title=title).matches_name(title="Friends")
+        self.assertTrue(result)
+
+    def test_name_matches_mixed_case_and_non_words_and_typos(self):
+        title = "Fr!eNdS S01-S10 COMPLETE 4k"
+        result = Torrent.parse_title(title=title).matches_name(title="Friends")
+        self.assertTrue(result)
+
+
 class TestScore(unittest.TestCase):
     def test_sorting_series_by_score_names(self):
         search_query = SearchQuery(name="Friends", year=1994, season=5, episode=10)

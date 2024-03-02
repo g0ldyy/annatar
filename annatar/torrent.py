@@ -1,7 +1,7 @@
-import re
 from enum import Enum
 from typing import Any
 
+import Levenshtein
 import PTN
 import structlog
 from pydantic import BaseModel, field_validator
@@ -15,6 +15,7 @@ log = structlog.get_logger(__name__)
 # 4 bits: 16 values  (0 to 15)
 # I'm not using any more than this. 8 is far too wide a decision tree
 
+NAME_MATCH_BIT_POS = 24
 SEASON_MATCH_BIT_POS = 20
 RESOLUTION_BIT_POS = 14
 AUDIO_BIT_POS = 8
@@ -194,8 +195,7 @@ class TorrentMeta(BaseModel):
         return -1
 
     def matches_name(self, title: str) -> bool:
-        sanitized_name: str = re.sub(r"\W+", r"\\W+", title)
-        return bool(re.search(rf"^{sanitized_name}$", self.title, re.IGNORECASE))
+        return Levenshtein.ratio(self.title.lower(), title.lower()) > 0.8
 
     @property
     def score(self):
