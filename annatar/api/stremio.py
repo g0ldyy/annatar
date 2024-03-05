@@ -108,10 +108,18 @@ async def get_hashes(
     }
 
 
-@router.get(
+@router.api_route(
+    # we don't use the file name, but Stremio uses it for Trakt and Opensubtitles lookups
+    "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:int}/{file_name:str}",
+    response_model=StreamResponse,
+    response_model_exclude_none=True,
+    methods=["GET"],
+)
+@router.api_route(
     "/rd/{debrid_api_key:str}/{info_hash:str}/{file_id:int}",
     response_model=StreamResponse,
     response_model_exclude_none=True,
+    methods=["GET"],
 )
 async def get_rd_stream(
     request: Request,

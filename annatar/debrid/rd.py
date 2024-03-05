@@ -27,7 +27,7 @@ async def find_streamable_file_id(
     files: list[TorrentFile],
     season: int = 0,
     episode: int = 0,
-) -> int | None:
+) -> TorrentFile | None:
     if len(files) == 0:
         log.debug("No files, returning 0")
         return None
@@ -40,7 +40,7 @@ async def find_streamable_file_id(
     sorted_files: list[TorrentFile] = sorted(video_files, key=lambda f: f.bytes, reverse=True)
     if not season or not episode:
         log.debug("returning biggest file", file=sorted_files[0])
-        return sorted_files[0].id if human.is_video(sorted_files[0].path) else None
+        return sorted_files[0] if human.is_video(sorted_files[0].path) else None
 
     for file in sorted_files:
         path = file.path.lower()
@@ -53,7 +53,7 @@ async def find_streamable_file_id(
                 season=season,
                 episode=episode,
             )
-            return file.id
+            return file
     log.info(
         "No file found for season/episode",
         season=season,
@@ -225,31 +225,33 @@ async def get_stream_link(
             )
             for f in cached_files
         ]
-        file_id: int | None = await find_streamable_file_id(
+        torrent_file: TorrentFile | None = await find_streamable_file_id(
             files=torrent_files,
             season=season,
             episode=episode,
         )
 
-        if not file_id:
+        if not torrent_file:
             log.debug("set does not contain a suitable file")
             continue
 
-        file: InstantFile | None = next((f for f in cached_files if f.id == file_id), None)
+        file: InstantFile | None = next((f for f in cached_files if f.id == torrent_file.id), None)
         if not file:
             log.error(
                 "cached file set does not contain the desired file_id. This should not be possible",
                 torrent=info_hash,
-                file_id=file_id,
+                file_id=torrent_file.id,
             )
             return None
 
         log.debug("found matching instantAvailable set")
         # this route has to match the route provided to provide the 302
-        url: str = f"/rd/{debrid_token}/{info_hash}/{file_id}"
+        url: str = (
+            f"/rd/{debrid_token}/{info_hash}/{torrent_file.id}/{torrent_file.path.split('/')[-1]}"
+        )
 
         await db.set_model(
-            key=f"rd:instant_file_set:torrent:{info_hash}:{file_id}",
+            key=f"rd:instant_file_set:torrent:{info_hash}:{torrent_file.id}",
             model=InstantFileSet(file_ids=[f.id for f in cached_files]),
             ttl=timedelta(hours=8),
         )
