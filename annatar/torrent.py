@@ -1,7 +1,7 @@
-import re
 from enum import Enum
 from typing import Any
 
+import Levenshtein
 import PTN
 import structlog
 from pydantic import BaseModel, field_validator
@@ -194,8 +194,7 @@ class TorrentMeta(BaseModel):
         return -1
 
     def matches_name(self, title: str) -> bool:
-        sanitized_name: str = re.sub(r"\W+", r"\\W+", title)
-        return bool(re.search(rf"^{sanitized_name}$", self.title, re.IGNORECASE))
+        return Levenshtein.ratio(self.title.lower(), title.lower()) > 0.9
 
     @property
     def score(self):
