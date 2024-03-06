@@ -32,7 +32,9 @@ async def find_streamable_file_id(
         log.debug("No files, returning 0")
         return None
 
-    video_files: list[TorrentFile] = [file for file in files if human.is_video(file.path)]
+    video_files: list[TorrentFile] = [
+        file for file in files if human.is_video(file.path, file.bytes)
+    ]
     if len(video_files) < 1:
         log.debug("release has no video files")
         return None
@@ -40,12 +42,14 @@ async def find_streamable_file_id(
     sorted_files: list[TorrentFile] = sorted(video_files, key=lambda f: f.bytes, reverse=True)
     if not season or not episode:
         log.debug("returning biggest file", file=sorted_files[0])
-        return sorted_files[0] if human.is_video(sorted_files[0].path) else None
+        return (
+            sorted_files[0] if human.is_video(sorted_files[0].path, sorted_files[0].bytes) else None
+        )
 
     for file in sorted_files:
         path = file.path.lower()
         if human.match_season_episode(season=season, episode=episode, file=path):
-            if not human.is_video(path):
+            if not human.is_video(path, file.bytes):
                 continue
             log.info(
                 "found matched file for season/episode",
