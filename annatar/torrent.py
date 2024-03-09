@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import Any
+from typing import Any, Generator
 
 import Levenshtein
 import PTN
 import structlog
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 log = structlog.get_logger(__name__)
 
@@ -15,6 +15,7 @@ log = structlog.get_logger(__name__)
 # 4 bits: 16 values  (0 to 15)
 # I'm not using any more than this. 8 is far too wide a decision tree
 
+TRASH = ["Cam", "Telesync", "Telecine", "Screener", "Workprint"]
 SEASON_MATCH_BIT_POS = 20
 RESOLUTION_BIT_POS = 14
 AUDIO_BIT_POS = 8
@@ -80,20 +81,23 @@ class Category(str, Enum):
 class TorrentMeta(BaseModel):
     title: str
     imdb: str | None = None
-    episode: list[int] = []
+    audio: list[str] = Field(default_factory=list)
+    bitDepth: list[int] = Field(default_factory=list)
+    codec: list[str] = Field(default_factory=list)
+    encoder: list[str] = Field(default_factory=list)
+    episode: list[int] = Field(default_factory=list)
     episodeName: str = ""
-    season: list[int] = []
-    resolution: str = ""
-    quality: str = ""
-    codec: str = ""
-    audio: str = ""
-    filetype: str = ""
-    encoder: str = ""
-    language: list[str] = []
-    subtitles: list[str] = []
-    bitDepth: int = 0
+    extended: bool = False
+    filetype: list[str] = Field(default_factory=list)
     hdr: bool = False
-    year: int = 0
+    language: list[str] = Field(default_factory=list)
+    quality: list[str] = Field(default_factory=list)
+    remastered: bool = False
+    remux: bool = False
+    resolution: list[str] = Field(default_factory=list)
+    season: list[int] = Field(default_factory=list)
+    subtitles: list[str] = Field(default_factory=list)
+    year: list[int] = Field(default_factory=list)
     raw_title: str = ""
 
     @field_validator("resolution", mode="before")
@@ -113,17 +117,9 @@ class TorrentMeta(BaseModel):
                 return "5K"
             if v.lower() == "4320p":
                 return "8K"
-        return v
-
-    @field_validator("season", "episode", "language", "subtitles", mode="before")
-    @classmethod
-    def ensure_is_list(cls: Any, v: Any):
-        if v is None:
-            return []
-        if isinstance(v, int):
-            return [v]
-        if isinstance(v, str):
-            return [v]
+            return v
+        if isinstance(v, list):
+            return [x for x in [cls.standardize_resolution(r) for r in v if r] if x]
         return v
 
     @field_validator("imdb", mode="before")
@@ -144,17 +140,16 @@ class TorrentMeta(BaseModel):
 
     @staticmethod
     def parse_title(title: str) -> "TorrentMeta":
-        meta: dict[Any, Any] = PTN.parse(title, standardise=True)
+        meta: dict[Any, Any] = PTN.parse(title, standardise=True, coherent_types=True)
         meta["raw_title"] = title
-        return TorrentMeta(**meta)
+        return TorrentMeta.model_validate(meta)
 
     @property
-    def audio_channels(self) -> str:
-        if "7.1" in self.audio:
-            return "7.1"
-        if "5.1" in self.audio:
-            return "5.1"
-        return ""
+    def audio_channels(self) -> Generator[str, None, None]:
+        if any("7.1" in a for a in self.audio):
+            yield "7.1"
+        if any("5.1" in a for a in self.audio):
+            yield "5.1"
 
     def is_season_episode(self, season: int, episode: int) -> bool:
         return self.score_series(season=season, episode=episode) > 0
@@ -200,7 +195,7 @@ class TorrentMeta(BaseModel):
     def score(self):
         return self.match_score(
             title=self.title,
-            year=self.year,
+            year=self.year.pop() if self.year else 0,
             season=self.season[0] if self.season else 0,
             episode=self.episode[0] if self.episode else 0,
         )
@@ -214,6 +209,8 @@ class TorrentMeta(BaseModel):
     ) -> int:
         if title and not self.matches_name(title):
             return -1000
+        if any(x in self.quality for x in TRASH):
+            return -2000
 
         season_match_score = (
             self.score_series(season=season, episode=episode) << SEASON_MATCH_BIT_POS
@@ -221,13 +218,15 @@ class TorrentMeta(BaseModel):
         if season_match_score < 0:
             return season_match_score
         resolution_score = (
-            score_resolution(self.resolution) << RESOLUTION_BIT_POS if self.resolution else 0
+            score_resolution(self.resolution.pop()) << RESOLUTION_BIT_POS
+            if len(self.resolution) > 0
+            else 0
         )
         audio_score = (
-            2 if "7.1" in self.audio else 1 if "5.1" in self.audio else 0
+            2 if "7.1" in self.audio_channels else 1 if "5.1" in self.audio_channels else 0
         ) << AUDIO_BIT_POS
 
-        year_match_score = (1 if self.year and self.year == year else 0) << YEAR_MATCH_BIT_POS
+        year_match_score = (1 if self.year and year in self.year else 0) << YEAR_MATCH_BIT_POS
         result: int = season_match_score | resolution_score | audio_score | year_match_score
         return result
 

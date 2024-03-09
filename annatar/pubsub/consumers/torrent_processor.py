@@ -67,7 +67,7 @@ async def process_message(result: TorrentSearchResult):
         log.info("skipping mismatched title", wanted=criteria.query, got=torrent.title)
         return
 
-    ttl = timedelta(weeks=1)
+    ttl = timedelta(weeks=8)
     if result.search_criteria.category == Category.Movie:
         await process_movie(torrent, criteria, ttl)
     else:

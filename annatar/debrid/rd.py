@@ -2,6 +2,7 @@ import asyncio
 from datetime import timedelta
 from hashlib import sha256
 from typing import AsyncGenerator, Optional
+from urllib.parse import quote_plus
 
 import structlog
 
@@ -209,7 +210,7 @@ async def get_stream_link(
     episode: int = 0,
 ) -> StreamLink | None:
     info_hash = info_hash.upper()
-    cache_key: str = f"rd:stream_link:torrent:{info_hash}"
+    cache_key: str = f"rd:stream_link:torrent:{info_hash}:{season}:{episode}"
     if cache := await db.get_model(cache_key, model=StreamLink):
         log.debug("Cached stream link found", link=cache)
         return cache
@@ -249,10 +250,10 @@ async def get_stream_link(
             return None
 
         log.debug("found matching instantAvailable set")
+        # urlencode the filename
+        filename = quote_plus(torrent_file.path.split("/")[-1])
         # this route has to match the route provided to provide the 302
-        url: str = (
-            f"/rd/{debrid_token}/{info_hash}/{torrent_file.id}/{torrent_file.path.split('/')[-1]}"
-        )
+        url: str = f"/rd/{debrid_token}/{info_hash}/{torrent_file.id}/{filename}"
 
         await db.set_model(
             key=f"rd:instant_file_set:torrent:{info_hash}:{torrent_file.id}",

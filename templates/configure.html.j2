@@ -28,7 +28,7 @@
 				</div>
 
 				<div class="form-floating mb-3">
-					<input required type="password" class="form-control" id="debrid_api_key" name="debrid_api_key" placeholder="API Key">
+					<input required type="text" class="form-control" id="debrid_api_key" name="debrid_api_key" placeholder="API Key">
 					<label for="debrid_api_key">Debrid API Key</label>
 				</div>
 
@@ -42,30 +42,28 @@
 				</div>
 
 				<div class="row">
-				  <div class="col-md-6">
-					<fieldset class="mb-3">
-					  <legend>Indexers</legend>
-					  {% for indexer in ctx.available_indexers %}
-					  <div class="form-check">
-						<input checked class="form-check-input" type="checkbox" id="{{ indexer.id }}" name="indexers[]" value="{{ indexer.id }}">
-						<label class="form-check-label" for="{{ indexer.id }}">{{ indexer.name }}</label>
-					  </div>
-					  {% endfor %}
-					</fieldset>
-				  </div> <!-- col -->
+				{% set categories = ctx.available_filters.keys() %}
+				{% for category in categories %}
+					{% if loop.index0 is divisibleby 2 and loop.index0 > 0 %}
+					</div><div class="row"> <!-- Close the current row and start a new row every 2 categories -->
+					{% endif %}
+					<div class="col-md-6">
+						<fieldset class="mb-3">
+							<legend>{{ category }}</legend>
+							{% for filter in ctx.available_filters[category] %}
+							<div class="form-check">
+								<input checked class="form-check-input" type="checkbox" id="{{ filter.id }}" name="filters[]" value="{{ filter.id }}">
+								<label class="form-check-label" for="{{ filter.id }}">{{ filter.name }}</label>
+							</div>
+							{% endfor %}
+						</fieldset>
+					</div>
+				{% endfor %}
+				</div>
 
-				  <div class="col-md-6">
-					<fieldset class="mb-3">
-					  <legend>Resolutions</legend>
-					  {% for resolution in ctx.available_resolutions %}
-					  <div class="form-check">
-						<input checked class="form-check-input" type="checkbox" id="{{ resolution }}" name="resolutions[]" value="{{ resolution }}">
-						<label class="form-check-label" for="{{ resolution }}">{{ resolution }}</label>
-					  </div>
-					  {% endfor %}
-					</fieldset>
-				  </div> <!-- col -->
-				</div> <!-- row -->
+				<div class="d-grid gap-2 mb-3">
+				<a class="text-muted" target="_blank" href="https://gitlab.com/stremio-add-ons/annatar/-/issues/34#note_1806206667">What happened to the indexers list?</a>
+				</div>
 
 				<div class="d-grid gap-2 mb-3">
 				<button type="submit" class="btn btn-primary btn-lg">Install</button>

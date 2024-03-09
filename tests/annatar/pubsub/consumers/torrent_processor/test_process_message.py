@@ -27,20 +27,17 @@ def mock_search_result(title: str) -> TorrentSearchResult:
     meta: TorrentMeta = TorrentMeta.parse_title(title)
     imdb: str = mock_imdb()
     season: int = meta.season[0] if meta.season else 0
-    episode: int = meta.episode[0] if meta.episode else 0
     return TorrentSearchResult(
         info_hash=uuid4().hex,
         title=title,
         guid=uuid4().hex,
         imdb=imdb,
-        year=meta.year,
+        year=meta.year[0] if meta.year else 0,
         category=[5000],
         search_criteria=TorrentSearchCriteria(
             query=meta.title,
             imdb=imdb,
-            year=meta.year,
-            season=season,
-            episode=episode,
+            year=meta.year[0] if meta.year else 0,
             category=Category.Movie if not season else Category.Series,
         ),
     )

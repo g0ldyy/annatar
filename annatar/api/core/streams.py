@@ -1,5 +1,6 @@
 import asyncio
 import math
+import os
 from collections import defaultdict
 from datetime import timedelta
 from itertools import chain
@@ -9,6 +10,7 @@ from prometheus_client import Counter, Histogram
 from pydantic import ValidationError
 
 from annatar import human, instrumentation
+from annatar.api.filters import Filter
 from annatar.database import db, odm
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
@@ -18,6 +20,7 @@ from annatar.torrent import Category, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
+SEARCH_TIMEOUT = int(os.getenv("SEARCH_TIMEOUT") or 10)
 UNIQUE_SEARCHES: Counter = Counter(
     name="unique_searches",
     documentation="Unique stream search counter",
@@ -30,7 +33,7 @@ async def _search(
     max_results: int,
     debrid: DebridService,
     imdb_id: str,
-    resolutions: list[str],
+    filters: list[Filter],
     season_episode: None | list[int] = None,
 ) -> StreamResponse:
     if season_episode is None:
@@ -43,6 +46,8 @@ async def _search(
         events.SearchRequest(
             imdb=imdb_id,
             category=Category(type),
+            season=season_episode[0] if len(season_episode) == 2 else None,
+            episode=season_episode[1] if len(season_episode) == 2 else None,
         )
     )
     log.info("searching for stream links")
@@ -51,7 +56,7 @@ async def _search(
         debrid=debrid,
         imdb=imdb_id,
         max_results=max_results,
-        resolutions=resolutions,
+        filters=filters,
         season=season_episode[0] if len(season_episode) == 2 else 0,
         episode=season_episode[1] if len(season_episode) == 2 else 0,
     )
@@ -70,37 +75,70 @@ async def _search(
     return StreamResponse(streams=streams)
 
 
+async def wait_for_results(
+    q: asyncio.Queue[events.TorrentAdded],
+    imdb: str,
+    season: int,
+    episode: int,
+    max_results: int,
+) -> None:
+    num_results = 0
+    while num_results < max_results:
+        new_torrent = await q.get()
+        if (
+            new_torrent.imdb == imdb
+            and new_torrent.season == season
+            and new_torrent.episode == episode
+        ):
+            num_results += 1
+
+
 async def get_stream_links(
     debrid: DebridService,
     imdb: str,
     max_results: int,
-    resolutions: list[str],
+    filters: list[Filter],
     season: int = 0,
     episode: int = 0,
 ) -> list[StreamLink]:
-    log.debug("getting stream links", imdb=imdb, max_results=max_results, resolutions=resolutions)
+    log.debug("getting stream links", imdb=imdb, max_results=max_results, filters=filters)
 
     # this is essentially a countdown. The timeout is how long the lock will be
     # held for. If we can lock it then we likely just kicked off a new search so
     # we should poll the database for new torrents. If we can't lock it then we
     # should only search once
-    lock_key: str = f"stream_links:{imdb}:{season}:{episode}"
-    tries = 5 if await db.try_lock(lock_key, timeout=timedelta(minutes=30)) else 1
+    lock_key: str = f"stream_links:{imdb}:{season}"
+    is_stale = await db.try_lock(lock_key, timeout=timedelta(hours=1))
 
-    log.debug("searching for torrents", imdb=imdb, season=season, episode=episode, tries=tries)
-    torrents: list[str] = []
-    for i in range(1, tries + 1):
-        if len(torrents) >= max_results * 2:
-            break
-        if i > 1:
-            await asyncio.sleep(1)
-        torrents = await odm.list_torrents(
-            imdb=imdb,
-            season=season,
-            episode=episode,
-            resolutions=resolutions,
+    if is_stale:
+        log.info(
+            "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
         )
-    log.debug("done searching for torrents", count=len(torrents))
+        try:
+            q = asyncio.Queue[events.TorrentAdded]()
+            await asyncio.wait(
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=SEARCH_TIMEOUT,
+                fs=[
+                    asyncio.create_task(
+                        events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
+                    ),
+                    asyncio.create_task(
+                        wait_for_results(q, imdb, season, episode, max_results // 3)
+                    ),
+                ],
+            )
+        except asyncio.TimeoutError:
+            log.debug("timeout waiting for results", imdb=imdb, season=season, episode=episode)
+
+    log.debug("retrieving torrents from cache", imdb=imdb, season=season, episode=episode)
+    torrents: list[str] = await odm.list_torrents(
+        imdb=imdb,
+        season=season,
+        episode=episode,
+        filters=filters,
+    )
+    log.debug("done retrieving torrents from cache", count=len(torrents))
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0
@@ -116,7 +154,7 @@ async def get_stream_links(
         total_processed += 1
         resolution: str = ""
         try:
-            resolution: str = TorrentMeta.parse_title(link.name).resolution
+            resolution: str = next(iter(TorrentMeta.parse_title(link.name).resolution), "NONE")
         except ValidationError as e:
             log.debug("error parsing title", title=link.name, exc_info=e)
             continue
@@ -139,22 +177,22 @@ def map_stream_link(link: StreamLink, debrid: DebridService) -> Stream:
     meta: TorrentMeta = TorrentMeta.parse_title(link.name)
 
     meta_parts: list[str] = []
-    if meta.resolution:
-        meta_parts.append(f"📺{meta.resolution}")
-    if meta.bitDepth:
-        meta_parts.append(f"{meta.bitDepth}bit")
+    if resolution := next(iter(meta.resolution), None):
+        meta_parts.append(f"📺{resolution}")
+    if bitDepth := next(iter(meta.bitDepth), None):
+        meta_parts.append(f"{bitDepth}bit")
     if meta.hdr:
         meta_parts.append("HDR")
-    if meta.audio_channels:
-        meta_parts.append(f"🔊{meta.audio_channels}")
-    if meta.codec:
-        meta_parts.append(f"{meta.codec}")
+    if audio_channels := next(iter(meta.audio_channels), None):
+        meta_parts.append(f"🔊{audio_channels}")
+    if codec := next(iter(meta.codec), None):
+        meta_parts.append(f"{codec}")
 
     meta_parts.append(f"💾{human.bytes(float(link.size))}")
 
     name = f"[{debrid.short_name()}+] Annatar {debrid.short_name()}"
-    name += f" {meta.resolution}" if meta.resolution else ""
-    name += f" {meta.audio_channels}" if meta.audio_channels else ""
+    name += f" {resolution}" if resolution else ""
+    name += f" {audio_channels}" if audio_channels else ""
 
     return Stream(
         url=link.url.strip(),
@@ -196,23 +234,19 @@ async def search(
     debrid: DebridService,
     imdb_id: str,
     season_episode: None | list[int] = None,
-    indexers: None | list[str] = None,
-    resolutions: None | list[str] = None,
+    filters: list[Filter] | None = None,
 ) -> StreamResponse:
-    if indexers is None:
-        indexers = []
+    if filters is None:
+        filters = []
     if season_episode is None:
         season_episode = []
-    if resolutions is None:
-        resolutions = []
 
     log.debug(
         "searching for content",
         type=type,
         id=imdb_id,
         season_episode=season_episode,
-        indexers=indexers,
-        resolutions=resolutions,
+        filters=filters,
     )
     with REQUEST_DURATION.labels(
         type=type,
@@ -225,7 +259,7 @@ async def search(
                 debrid=debrid,
                 imdb_id=imdb_id,
                 season_episode=season_episode,
-                resolutions=resolutions,
+                filters=filters,
             )
         except Exception as e:
             log.error("error searching", type=type, id=imdb_id, exc_info=e)

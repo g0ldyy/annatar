@@ -103,7 +103,7 @@ async def get_instant_availability(
             cached_files = [
                 InstantFile(id=int(file_id), **file_info) for file_id, file_info in set.items()
             ]
-            log.info("found cached files", count=len(cached_files))
+            log.info("found cached files", count=len(cached_files), info_hash=info_hash)
             await db.set(cache_key, "1", ttl=timedelta(hours=1))
             yield cached_files
 

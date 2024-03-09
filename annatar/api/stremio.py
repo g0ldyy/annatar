@@ -68,7 +68,11 @@ def get_source_ip(request: Request) -> str:
 
 @router.get("/{b64config:str}/manifest.json")
 async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
-    user_config: UserConfig = config.parse_config(b64config)
+    try:
+        user_config: UserConfig = config.parse_config(b64config)
+    except Exception as e:
+        log.error("Error parsing config", exc_info=e)
+        raise HTTPException(status_code=400, detail="Invalid configuration") from e
     debrid: Optional[DebridService] = get_provider(
         provider_name=user_config.debrid_service,
         api_key=user_config.debrid_api_key,
@@ -160,7 +164,11 @@ async def list_streams(
     ],
     b64config: Annotated[str, Path(description="base64 encoded json blob")],
 ) -> StreamResponse:
-    user_config: UserConfig = config.parse_config(b64config)
+    try:
+        user_config: UserConfig = config.parse_config(b64config)
+    except Exception as e:
+        log.error("Error parsing config", exc_info=e)
+        raise HTTPException(status_code=400, detail="Invalid configuration") from e
     debrid: Optional[DebridService] = get_provider(
         provider_name=user_config.debrid_service,
         api_key=user_config.debrid_api_key,
@@ -177,8 +185,7 @@ async def list_streams(
         imdb_id=imdb_id,
         season_episode=season_episode,
         max_results=user_config.max_results,
-        indexers=user_config.indexers,
-        resolutions=user_config.resolutions,
+        filters=user_config.filters,
     )
 
     for stream in res.streams:

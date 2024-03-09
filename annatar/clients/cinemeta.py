@@ -1,4 +1,3 @@
-import asyncio
 import re
 from datetime import datetime, timedelta
 from typing import Optional
@@ -93,19 +92,17 @@ async def _get_media_info(id: str, type: str) -> MediaInfo | None:
 async def get_media_info(id: str, type: str) -> Optional[MediaInfo]:
     cache_key = f"cinemeta:{type}:{id}"
 
-    async with await db.lock(f"{cache_key}:lock"):
-        cached_result: Optional[MediaInfo] = await db.get_model(cache_key, model=MediaInfo)
-        if cached_result:
-            return cached_result
-        await asyncio.sleep(0.1)
+    cached_result: Optional[MediaInfo] = await db.get_model(cache_key, model=MediaInfo)
+    if cached_result:
+        return cached_result
 
-        res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
-        if res is None:
-            return None
+    res: Optional[MediaInfo] = await _get_media_info(id=id, type=type)
+    if res is None:
+        return None
 
-        await db.set(
-            cache_key,
-            res.model_dump_json(),
-            ttl=timedelta(days=30),
-        )
-        return res
+    await db.set(
+        cache_key,
+        res.model_dump_json(),
+        ttl=timedelta(days=30),
+    )
+    return res

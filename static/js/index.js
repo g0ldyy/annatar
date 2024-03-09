@@ -1,19 +1,24 @@
 function getFormData(e) {
 	// Serialize form fields into an object
 	var formData = new FormData(document.getElementById('theform'));
-	var formObject = {};
+	var formObject = {
+		"filters": Array.from(document.querySelectorAll('input[type="checkbox"]:not(:checked)')).map(x => x.id),
+	};
 	formData.forEach(function(value, key){
-		if (key.endsWith('[]')) {
-			// Remove '[]' from the key name
-			var cleanKey = key.slice(0, -2);
-			// Initialize the array if it doesn't exist
+		// Remove '[]' from the key name
+		var isList = key.endsWith('[]');
+		var cleanKey = isList ? key.slice(0, -2) : key;
+		if (cleanKey === "filters") {
+			return;
+		}
+		// Initialize the array if it doesn't exist
+		if (isList) {
 			if (!formObject[cleanKey]) {
 				formObject[cleanKey] = [];
 			}
 			// Push the value into the array
 			formObject[cleanKey].push(value);
 		} else {
-			// Handle regular field
 			formObject[key] = value;
 		}
 	});

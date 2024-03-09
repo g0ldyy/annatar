@@ -16,6 +16,8 @@ T = TypeVar("T", bound=BaseModel)
 class SearchRequest(BaseModel):
     imdb: str
     category: Category
+    season: int | None = None
+    episode: int | None = None
 
     @staticmethod
     async def listen(queue: asyncio.Queue["SearchRequest"], consumer: str):
