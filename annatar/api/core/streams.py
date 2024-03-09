@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import math
 import os
 from collections import defaultdict
@@ -93,6 +94,26 @@ async def wait_for_results(
             num_results += 1
 
 
+async def wait_for_new_torrents(
+    imdb: str,
+    season: int,
+    episode: int,
+    max_results: int,
+):
+    with contextlib.suppress(asyncio.TimeoutError):
+        q = asyncio.Queue[events.TorrentAdded]()
+        await asyncio.wait(
+            return_when=asyncio.FIRST_COMPLETED,
+            timeout=SEARCH_TIMEOUT,
+            fs=[
+                asyncio.create_task(
+                    events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
+                ),
+                asyncio.create_task(wait_for_results(q, imdb, season, episode, max_results // 3)),
+            ],
+        )
+
+
 async def get_stream_links(
     debrid: DebridService,
     imdb: str,
@@ -107,30 +128,6 @@ async def get_stream_links(
     # held for. If we can lock it then we likely just kicked off a new search so
     # we should poll the database for new torrents. If we can't lock it then we
     # should only search once
-    lock_key: str = f"stream_links:{imdb}:{season}"
-    is_stale = await db.try_lock(lock_key, timeout=timedelta(hours=1))
-
-    if is_stale:
-        log.info(
-            "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
-        )
-        try:
-            q = asyncio.Queue[events.TorrentAdded]()
-            await asyncio.wait(
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=SEARCH_TIMEOUT,
-                fs=[
-                    asyncio.create_task(
-                        events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
-                    ),
-                    asyncio.create_task(
-                        wait_for_results(q, imdb, season, episode, max_results // 3)
-                    ),
-                ],
-            )
-        except asyncio.TimeoutError:
-            log.debug("timeout waiting for results", imdb=imdb, season=season, episode=episode)
-
     log.debug("retrieving torrents from cache", imdb=imdb, season=season, episode=episode)
     torrents: list[str] = await odm.list_torrents(
         imdb=imdb,
@@ -139,6 +136,19 @@ async def get_stream_links(
         filters=filters,
     )
     log.debug("done retrieving torrents from cache", count=len(torrents))
+    if len(torrents) == 0:
+        is_stale = await db.try_lock(f"stream_links:{imdb}:{season}", timeout=timedelta(hours=1))
+        if is_stale:
+            log.info(
+                "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
+            )
+            await wait_for_new_torrents(imdb, season, episode, max_results)
+            torrents = await odm.list_torrents(
+                imdb=imdb,
+                season=season,
+                episode=episode,
+                filters=filters,
+            )
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0
