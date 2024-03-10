@@ -118,29 +118,39 @@ async def _get_stream_for_torrent(
         log.error("cached torrent not found", info_hash=info_hash)
         return None
 
-    torrent_id: Optional[str] = await api.add_magnet(
-        info_hash=info_hash,
-        debrid_token=debrid_token,
-        source_ip=source_ip,
-    )
+    torrent_id: Optional[str] = None
+
+    if existing_torrents := await api.list_torrents(debrid_token=debrid_token):
+        log.debug("existing torrents found", count=len(existing_torrents))
+        for t in existing_torrents:
+            if t.hash.casefold() == info_hash.casefold():
+                log.debug("torrent already exists", info_hash=info_hash)
+                torrent_id = t.id
+                break
 
     if not torrent_id:
-        log.info("no torrent id found")
-        return None
+        torrent_id = await api.add_magnet(
+            info_hash=info_hash,
+            debrid_token=debrid_token,
+            source_ip=source_ip,
+        )
+        log.info("magnet added to RD", torrent_id=torrent_id)
 
-    log.info("magnet added to RD", torrent_id=torrent_id)
+        if not torrent_id:
+            log.info("no torrent id found")
+            return None
 
-    log.info("selecting instant file set in torrent", torrent_id=torrent_id, file_id=file_id)
-    selected: bool = await api.select_torrent_files(
-        torrent_id=torrent_id,
-        debrid_token=debrid_token,
-        file_ids=file_set.file_ids,
-        source_ip=source_ip,
-    )
-    if selected:
-        log.info("Selected torrent file set", torrent_id=torrent_id, file_id=file_id)
-    else:
-        log.error("Failed to select torrent file set", torrent_id=torrent_id, file_id=file_id)
+        log.info("selecting instant file set in torrent", torrent_id=torrent_id, file_id=file_id)
+        selected: bool = await api.select_torrent_files(
+            torrent_id=torrent_id,
+            debrid_token=debrid_token,
+            file_ids=file_set.file_ids,
+            source_ip=source_ip,
+        )
+        if selected:
+            log.info("Selected torrent file set", torrent_id=torrent_id, file_id=file_id)
+        else:
+            log.error("Failed to select torrent file set", torrent_id=torrent_id, file_id=file_id)
 
     torrent_link: str | None = await get_torrent_link(
         torrent_id=torrent_id,

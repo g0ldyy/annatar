@@ -108,11 +108,12 @@ async def get_instant_availability(
             yield cached_files
 
 
-async def list_torrents(debrid_token: str) -> list[TorrentInfo]:
+async def list_torrents(debrid_token: str, page: int = 1, limit: int = 50) -> list[TorrentInfo]:
     response_json = await make_request(
         method="GET",
         url="/torrents",
         debrid_token=debrid_token,
+        url_values={"page": str(page), "limit": str(limit)},
     )
     if not response_json:
         return []
