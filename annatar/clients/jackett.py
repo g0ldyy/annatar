@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import os
 import re
 from datetime import datetime, timedelta
@@ -139,28 +141,29 @@ async def make_request(
 
         params["apikey"] = JACKETT_API_KEY
         log.debug("jackett request")
-        async with aiohttp.ClientSession() as session, session.get(
-            url=f"{JACKETT_URL}{url}",
-            params=params,
-            timeout=timeout,
-            headers={"Accept": "application/json"},
-        ) as response:
-            if response.status == 200:
-                raw: dict[str, Any] = await response.json()
-                res = model.model_validate(raw)
-                await db.set_model(cache_key, res, JACKETT_CACHE_MINUTES)
-                return res
+        with contextlib.suppress(asyncio.TimeoutError):
+            async with aiohttp.ClientSession() as session, session.get(
+                url=f"{JACKETT_URL}{url}",
+                params=params,
+                timeout=timeout,
+                headers={"Accept": "application/json"},
+            ) as response:
+                if response.status == 200:
+                    raw: dict[str, Any] = await response.json()
+                    res = model.model_validate(raw)
+                    await db.set_model(cache_key, res, JACKETT_CACHE_MINUTES)
+                    return res
 
-            body = await response.text()
-            log.error(
-                "jacket request failed with bad status code",
-                status=response.status,
-                reason=response.reason,
-                body=body,
-                exc_info=True,
-            )
-            raise JackettSearchError(
-                f"Jackett request failed: {response.reason}",
-                status=response.status,
-                body=body,
-            )
+                body = await response.text()
+                log.error(
+                    "jacket request failed with bad status code",
+                    status=response.status,
+                    reason=response.reason,
+                    body=body,
+                    exc_info=True,
+                )
+                raise JackettSearchError(
+                    f"Jackett request failed: {response.reason}",
+                    status=response.status,
+                    body=body,
+                )

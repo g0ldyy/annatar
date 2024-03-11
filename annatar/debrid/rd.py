@@ -120,7 +120,7 @@ async def _get_stream_for_torrent(
 
     torrent_id: Optional[str] = None
 
-    if existing_torrents := await api.list_torrents(debrid_token=debrid_token):
+    if existing_torrents := await api.list_torrents(debrid_token=debrid_token, limit=100):
         log.debug("existing torrents found", count=len(existing_torrents))
         for t in existing_torrents:
             if t.hash.casefold() == info_hash.casefold():

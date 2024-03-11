@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import os
 from datetime import timedelta
 from typing import Annotated
@@ -31,13 +32,13 @@ class MediaResponse(BaseModel):
 
 
 @router.get("/imdb/{category}/{imdb_id}")
-async def root_redirect(
+async def search_imdb(
     imdb_id: Annotated[str, Path(description="IMDB ID", examples=["tt0120737"], regex=r"^tt\d+$")],
     category: Annotated[Category, Path(description="Category", examples=["movie", "series"])],
     season: Annotated[int | None, Query(description="Season")] = None,
     episode: Annotated[int | None, Query(description="Episode")] = None,
     limit: Annotated[int, Query(description="Limit results")] = 10,
-    timeout: Annotated[int, Query(description="Search timeout", lt=61, gt=1)] = 10,
+    timeout: Annotated[int, Query(description="Search timeout", le=10, ge=1)] = 10,
 ) -> MediaResponse:
     await events.SearchRequest.publish(
         request=events.SearchRequest(
@@ -59,18 +60,15 @@ async def root_redirect(
     if not torrents and await db.try_lock(
         f"stream_links:{imdb_id}:{season}", timeout=timedelta(hours=1)
     ):
-        timeout_time = asyncio.get_event_loop().time() + timeout
-        while len(torrents) < limit:
-            torrents = await odm.list_torrents(
+        torrents = await asyncio.wait_for(
+            timeout=timeout,
+            fut=wait_for_torrents(
                 imdb=imdb_id,
+                limit=limit,
                 season=season,
                 episode=episode,
-                limit=limit,
-            )
-            if len(torrents) < limit:
-                if asyncio.get_event_loop().time() > timeout_time:
-                    break
-                await asyncio.sleep(1)
+            ),
+        )
 
     mapped = await asyncio.gather(*[build_media(info_hash) for info_hash in torrents])
     return MediaResponse(media=[media for media in mapped if media is not None])
@@ -81,3 +79,25 @@ async def build_media(info_hash: str) -> None | Media:
     if title is None:
         return None
     return Media(hash=info_hash, title=title)
+
+
+async def wait_for_torrents(
+    imdb: str, limit: int, season: int | None = None, episode: int | None = None
+) -> list[str]:
+    torrents: list[str] = []
+    with contextlib.suppress(asyncio.TimeoutError):
+        torrents = await odm.list_torrents(
+            imdb=imdb,
+            season=season,
+            episode=episode,
+            limit=limit,
+        )
+        while len(torrents) < limit:
+            await asyncio.sleep(1)
+            torrents = await odm.list_torrents(
+                imdb=imdb,
+                season=season,
+                episode=episode,
+                limit=limit,
+            )
+    return torrents

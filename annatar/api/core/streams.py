@@ -100,18 +100,22 @@ async def wait_for_new_torrents(
     episode: int,
     max_results: int,
 ):
+    q = asyncio.Queue[events.TorrentAdded]()
+    tasks = [
+        asyncio.create_task(
+            events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
+        ),
+        asyncio.create_task(wait_for_results(q, imdb, season, episode, max_results // 3)),
+    ]
     with contextlib.suppress(asyncio.TimeoutError):
-        q = asyncio.Queue[events.TorrentAdded]()
         await asyncio.wait(
-            return_when=asyncio.FIRST_COMPLETED,
+            return_when=asyncio.FIRST_EXCEPTION,
             timeout=SEARCH_TIMEOUT,
-            fs=[
-                asyncio.create_task(
-                    events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
-                ),
-                asyncio.create_task(wait_for_results(q, imdb, season, episode, max_results // 3)),
-            ],
+            fs=tasks,
         )
+    for task in tasks:
+        if not task.done():
+            task.cancel()
 
 
 async def get_stream_links(
