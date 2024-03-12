@@ -62,8 +62,8 @@ def match_season(season: int, file: str) -> bool:
     )
 
 
-def is_video(file: str, size: int) -> bool:
-    if size < 100000000:  # 100MB
+def is_video(file: str, size: int = 0) -> bool:
+    if size and size < 100000000:  # 100MB
         return False
     return file.split(".")[-1] in VIDEO_EXTENSIONS
 
