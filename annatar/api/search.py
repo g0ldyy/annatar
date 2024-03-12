@@ -60,15 +60,16 @@ async def search_imdb(
     if not torrents and await db.try_lock(
         f"stream_links:{imdb_id}:{season}", timeout=timedelta(hours=1)
     ):
-        torrents = await asyncio.wait_for(
-            timeout=timeout,
-            fut=wait_for_torrents(
-                imdb=imdb_id,
-                limit=limit,
-                season=season,
-                episode=episode,
-            ),
-        )
+        with contextlib.suppress(asyncio.TimeoutError):
+            torrents = await asyncio.wait_for(
+                timeout=timeout,
+                fut=wait_for_torrents(
+                    imdb=imdb_id,
+                    limit=limit,
+                    season=season,
+                    episode=episode,
+                ),
+            )
 
     mapped = await asyncio.gather(*[build_media(info_hash) for info_hash in torrents])
     return MediaResponse(media=[media for media in mapped if media is not None])
