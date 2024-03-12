@@ -40,3 +40,9 @@ class CloudHistoryItem(BaseModel):
     is_directory: bool = Field(..., alias="isDirectory")
     created_on: str = Field(..., alias="createdOn")
     server: str
+
+
+class CachedFileInfo(BaseModel):
+    name: str
+    size: int
+    link: str

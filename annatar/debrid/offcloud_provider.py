@@ -1,10 +1,12 @@
 import asyncio
+from datetime import timedelta
 from typing import Any, AsyncGenerator
 
 import aiohttp
 import structlog
 from pydantic import TypeAdapter
 
+from annatar.database import db
 from annatar.debrid import magnet
 from annatar.debrid.debrid_service import DebridService
 from annatar.debrid.models import StreamLink
@@ -111,7 +113,7 @@ class OffCloudProvider(DebridService):
         if not response:
             return None
         for link in response:
-            if not is_video(link):
+            if not is_video(link, torrent_info.file_size):
                 continue
 
             if not season and not episode:
@@ -129,6 +131,18 @@ class OffCloudProvider(DebridService):
         season: int,
         episode: int,
     ) -> StreamLink | None:
+        cache_key = f"offcloud:{info_hash}:files"
+        if cached_files_raw := await db.get(cache_key):
+            cached_files = TypeAdapter(list[StreamLink]).validate_python(cached_files_raw)
+            for file in cached_files:
+                meta = TorrentMeta.parse_title(file.name)
+                if not season:
+                    return file
+                if season in meta.season and episode in meta.episode:
+                    return file
+            return None
+
+        # check it live
         magnet_resp = await self.add_magent_link(magnet.make_magnet_link(info_hash))
         if not magnet_resp:
             return None
@@ -165,7 +179,7 @@ class OffCloudProvider(DebridService):
         return False
 
     def short_name(self) -> str:
-        return "offcloud"
+        return "OC"
 
     def name(self) -> str:
         return "OffCloud"
@@ -199,3 +213,21 @@ class OffCloudProvider(DebridService):
                     return
             if stop.is_set():
                 return
+
+
+async def get_file_size(info_hash: str, link: str) -> int | None:
+    cache_key = f"offcloud:v1:{info_hash}:{link}:size"
+    if size := await db.get(cache_key):
+        await db.set_ttl(cache_key, timedelta(days=30))
+        return int(size)
+
+    async with aiohttp.ClientSession() as session, session.head(
+        link, max_redirects=False
+    ) as response:
+        response.raise_for_status()
+        size = int(response.headers.get("Content-Length") or 0) or None
+
+    if size:
+        await db.set(cache_key, str(size), ttl=timedelta(days=30))
+
+    return size

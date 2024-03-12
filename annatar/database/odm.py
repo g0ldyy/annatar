@@ -35,6 +35,12 @@ class Keys:
             cache_key = f"{cache_key}:{season}"
         return cache_key
 
+    @staticmethod
+    def offcloud_files(info_hash: str) -> str:
+        if not info_hash:
+            raise ValueError("info_hash is required")
+        return f"offcloud:v1:{info_hash}:files"
+
 
 async def add_torrent(
     info_hash: str,
@@ -113,3 +119,7 @@ async def set_torrent_meta(info_hash: str, meta: dict[str, str]) -> bool:
 
 async def get_torrent_meta(info_hash: str) -> dict[str, str] | None:
     return await db.hgetall(Keys.torrent(info_hash))
+
+
+async def get_offcloud_files(info_hash: str) -> list[OffcloudFile] | None:
+    return await db.get(Keys.offcloud_files(info_hash))
