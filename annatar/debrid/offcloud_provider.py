@@ -21,7 +21,7 @@ from annatar.torrent import TorrentMeta
 log = structlog.get_logger(__name__)
 
 
-class OffCloud(DebridService):
+class OffCloudProvider(DebridService):
     BASE_URL = "https://offcloud.com/api"
 
     async def make_request(
@@ -35,6 +35,7 @@ class OffCloud(DebridService):
         params["key"] = self.api_key
         url = self.BASE_URL + url
 
+        log.debug("make request", method=method, url=url, data=data, params=params)
         async with aiohttp.ClientSession() as session, session.request(
             method,
             url,
@@ -69,7 +70,7 @@ class OffCloud(DebridService):
         if not response:
             return None
 
-        return CloudStatusResponse(**response)
+        return CloudStatusResponse.model_validate(response)
 
     async def get_torrent_instant_availability(
         self, magnet_links: list[str]
@@ -131,18 +132,22 @@ class OffCloud(DebridService):
         magnet_resp = await self.add_magent_link(magnet.make_magnet_link(info_hash))
         if not magnet_resp:
             return None
-        if magnet_resp.status != "downloaded":
-            log.error("magnet is not downloaded", magnet_resp=magnet_resp)
+
+        torrent_infos = await self.get_torrent_info(magnet_resp.request_id)
+        if not torrent_infos:
+            log.error("failed to get torrent info", magnet_resp=magnet_resp)
             return None
 
-        torrent_info = await self.get_torrent_info(magnet_resp.request_id)
+        torrent_info = next(
+            (r for r in torrent_infos.requests if r.request_id == magnet_resp.request_id), None
+        )
         if not torrent_info:
-            log.error("failed to get torrent info", magnet_resp=magnet_resp)
+            log.error("failed to find torrent info", magnet_resp=magnet_resp)
             return None
 
         download_link = await self.create_download_link(
             magnet_resp.request_id,
-            torrent_info.status,
+            torrent_info,
             season,
             episode,
         )
@@ -151,8 +156,8 @@ class OffCloud(DebridService):
             return None
         return StreamLink(
             url=download_link,
-            name=torrent_info.status.file_name,
-            size=0,
+            name=torrent_info.file_name,
+            size=torrent_info.file_size,
         )
 
     # implement DebridService

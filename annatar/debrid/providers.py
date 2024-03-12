@@ -1,12 +1,14 @@
 from typing import Optional
 
 from annatar.debrid.debrid_service import DebridService
+from annatar.debrid.offcloud_provider import OffCloudProvider
 from annatar.debrid.premiumize_provider import PremiumizeProvider
 from annatar.debrid.real_debrid_provider import RealDebridProvider
 
 _providers: list[DebridService] = [
     RealDebridProvider(api_key="", source_ip=""),
     PremiumizeProvider(api_key="", source_ip=""),
+    OffCloudProvider(api_key="", source_ip=""),
 ]
 
 

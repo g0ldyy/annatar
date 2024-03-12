@@ -28,7 +28,7 @@ class TorrentInfo(BaseModel):
 
 
 class CloudStatusResponse(BaseModel):
-    status: TorrentInfo
+    requests: list[TorrentInfo]
 
 
 class CloudHistoryItem(BaseModel):
