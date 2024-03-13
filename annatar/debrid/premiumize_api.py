@@ -5,8 +5,8 @@ import aiohttp
 import structlog
 from pydantic import BaseModel
 
+from annatar import magnet
 from annatar.database import db
-from annatar.debrid import magnet
 from annatar.debrid.pm_models import DirectDLResponse
 from annatar.instrumentation import HTTP_CLIENT_REQUEST_DURATION
 

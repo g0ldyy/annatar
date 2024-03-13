@@ -17,6 +17,8 @@ if [ "${provider}" == "real_debrid" ]; then
 	debrid_api_key=$(op read "op://Personal/Real-debrid/API Token")
 elif [ "${provider}" == "premiumize" ]; then
 	debrid_api_key=$(op read "op://Personal/Premiumize.me/API Key")
+elif [ "${provider}" == "debridlink" ]; then
+	debrid_api_key=$(op read "op://Personal/sbu7y6nvqvcx3inmrodr6436ce/credential")
 else
 	echo "Invalid provider: ${provider}"
 	exit 1

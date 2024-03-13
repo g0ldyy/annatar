@@ -4,8 +4,7 @@ from typing import Any, AsyncGenerator
 import aiohttp
 import structlog
 
-from annatar import instrumentation
-from annatar.debrid import magnet
+from annatar import instrumentation, magnet
 from annatar.debrid.rd_models import InstantFile, TorrentInfo, UnrestrictedLink
 
 ROOT_URL = "https://api.real-debrid.com/rest/1.0"

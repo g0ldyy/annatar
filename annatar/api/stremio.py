@@ -11,6 +11,7 @@ from starlette.status import HTTP_302_FOUND
 from annatar import config
 from annatar.api.core import streams
 from annatar.config import UserConfig
+from annatar.debrid.debridlink import DebridLink
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
 from annatar.debrid.real_debrid_provider import RealDebridProvider
@@ -110,6 +111,28 @@ async def get_hashes(
     return {
         "hashes": hashes,
     }
+
+
+@router.api_route(
+    "/dl/{api_key}/{info_hash}/{file_name}",
+    response_model=StreamResponse,
+    response_model_exclude_none=True,
+    methods=["GET"],
+)
+async def get_dl_stream(
+    request: Request,
+    api_key: Annotated[str, Path(description="Debrid token")],
+    info_hash: Annotated[str, Path(description="Torrent info hash")],
+    file_name: Annotated[str, Path(description="Name of the file in the torrent")],
+) -> RedirectResponse:
+    debrid: DebridLink = DebridLink(api_key=api_key, source_ip=get_source_ip(request))
+    stream: StreamLink | None = await debrid.get_stream_for_torrent(
+        info_hash=info_hash,
+        file_name=file_name,
+    )
+    if not stream:
+        raise HTTPException(status_code=404, detail="No stream found")
+    return RedirectResponse(url=stream.url, status_code=HTTP_302_FOUND)
 
 
 @router.api_route(

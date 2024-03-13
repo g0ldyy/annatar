@@ -7,8 +7,8 @@ import structlog
 from aioresponses import aioresponses
 from redislite.client import StrictRedis
 
+from annatar import magnet
 from annatar.database import db, odm
-from annatar.debrid import magnet
 from annatar.pubsub.consumers.torrent_processor import (
     process_message,
     resolve_magnet_link,
@@ -63,7 +63,7 @@ class map_matched_result(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(search_result.info_hash, torrents)
 
     async def test_does_not_allow_mismatched_imdb(self):
-        title = "The Lord of the Rings The Return of the King 2003 1080p X265"
+        title = "The Lord of the Rings The Return of the King TS 2003 1080p X265"
         search_result = mock_search_result(title)
         search_result.search_criteria.imdb = mock_imdb()
 

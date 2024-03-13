@@ -154,6 +154,9 @@ class TorrentMeta(BaseModel):
     def is_season_episode(self, season: int, episode: int) -> bool:
         return self.score_series(season=season, episode=episode) > 0
 
+    def is_trash(self) -> bool:
+        return any(x in self.quality for x in TRASH)
+
     def score_series(self, season: int, episode: int) -> int:
         """
         Score a torrent based on season and episode where the rank is as follows:
@@ -209,8 +212,8 @@ class TorrentMeta(BaseModel):
     ) -> int:
         if title and not self.matches_name(title):
             return -1000
-        if any(x in self.quality for x in TRASH):
-            return -2000
+        if self.is_trash():
+            return -5000
 
         season_match_score = (
             self.score_series(season=season, episode=episode) << SEASON_MATCH_BIT_POS

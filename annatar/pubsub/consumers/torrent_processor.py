@@ -6,8 +6,8 @@ from itertools import product
 import aiohttp
 import structlog
 
+from annatar import magnet
 from annatar.database import db, odm
-from annatar.debrid import magnet
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, Torrent, TorrentMeta
 
