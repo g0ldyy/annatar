@@ -27,21 +27,30 @@ class BaseJackettProcessor(BaseModel):
     categories: list[Category]
 
     async def run(self):
-        queue: asyncio.Queue[SearchRequest] = asyncio.Queue(maxsize=self.queue_size)
+        workers: list[asyncio.Task] = []
+        while True:
+            try:
+                queue: asyncio.Queue[SearchRequest] = asyncio.Queue(maxsize=self.queue_size)
 
-        workers = [
-            asyncio.create_task(
-                self.process_queue(queue),
-                name=f"{self.indexer}-search-processor-{i}",
-            )
-            for i in range(self.num_workers)
-        ] + [asyncio.create_task(SearchRequest.listen(queue, self.indexer))]
+                workers = [
+                    asyncio.create_task(
+                        self.process_queue(queue),
+                        name=f"{self.indexer}-search-processor-{i}",
+                    )
+                    for i in range(self.num_workers)
+                ] + [asyncio.create_task(SearchRequest.listen(queue, self.indexer))]
 
-        await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
-
-        for worker in workers:
-            if not worker.done():
-                worker.cancel()
+                await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
+                log.error("search processor completed?", indexer=self.indexer)
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                log.error("search processor stopped unexpectedly", indexer=self.indexer, exc_info=e)
+                raise
+            finally:
+                for worker in workers:
+                    if not worker.done():
+                        worker.cancel()
 
     async def process_queue(self, queue: asyncio.Queue[SearchRequest]):
         while request := await queue.get():
@@ -55,6 +64,9 @@ class BaseJackettProcessor(BaseModel):
                 await process_message(self, request, media_info)
             except asyncio.CancelledError:
                 return
+            except Exception as e:
+                log.error("search processor stopped unexpectedly", indexer=self.indexer, exc_info=e)
+                await asyncio.sleep(1)
 
 
 async def process_message(

@@ -31,17 +31,16 @@ def start_torrent_processor(worker_id: int) -> None:
     loop.close()
 
 
-def start_search_processor(indexer: str, worker_id: int) -> None:
+def start_search_processor(indexer: str) -> None:
     from annatar.pubsub.consumers.torrent_search.base_jackett_processor import BaseJackettProcessor
 
     loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    _ = worker_id
     p = BaseJackettProcessor(
         indexer=indexer,
         supports_imdb=True,
         num_workers=WORKERS,
-        queue_size=WORKERS * 2,
+        queue_size=WORKERS * 5,
         categories=[Category.Movie, Category.Series],
     )
     loop.run_until_complete(p.run())
@@ -62,7 +61,7 @@ if __name__ == "__main__":
     for worker_id, indexer in enumerate(config.JACKETT_INDEXERS_LIST):
         thread: threading.Thread = threading.Thread(
             target=start_search_processor,
-            args=(indexer, worker_id),
+            args=(indexer,),
             daemon=True,
             name=f"search-processor-{indexer}-{worker_id}",
         )

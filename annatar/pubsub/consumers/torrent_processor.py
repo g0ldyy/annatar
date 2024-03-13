@@ -20,19 +20,29 @@ TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_D
 class TorrentProcessor:
     @staticmethod
     async def run(num_workers: int = 1):
-        queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
-            maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
-        )
-        workers = [
-            asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
-            for i in range(num_workers)
-        ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
+        while True:
+            workers: list[asyncio.Task] = []
+            try:
+                queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
+                    maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
+                )
+                workers = [
+                    asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
+                    for i in range(num_workers)
+                ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
 
-        await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
+                await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
 
-        for w in workers:
-            if not w.done():
-                w.cancel()
+                log.error("torrent processor worker exited unexpectedly", tasks=workers)
+            except asyncio.exceptions.CancelledError:
+                break
+            except Exception as err:
+                log.error("torrent processor error", exc_info=err)
+                await asyncio.sleep(5)
+            finally:
+                for w in workers:
+                    if not w.done():
+                        w.cancel()
 
 
 async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
@@ -49,6 +59,9 @@ async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
                 log.debug("finished processing torrent", torrent=result.info_hash or result.guid)
         except asyncio.exceptions.CancelledError:
             break
+        except Exception as err:
+            log.error("torrent processor error", exc_info=err)
+            await asyncio.sleep(5)
         finally:
             if result:
                 queue.task_done()
