@@ -51,14 +51,6 @@ class DebridLink(DebridService):
                 response_text=await response.text(),
             )
 
-    async def get_stream_link(
-        self,
-        info_hash: str,
-        season: int = 0,
-        episode: int = 0,
-    ) -> StreamLink | None:
-        raise NotImplementedError
-
     async def get_cached_torrents(self, info_hashes: list[str]) -> dict[str, CachedMagnet] | None:
         magnet_links = [urllib.parse.quote_plus(magnet.make_magnet_link(x)) for x in info_hashes]
         response = await self.make_request(

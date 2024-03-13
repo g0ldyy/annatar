@@ -19,6 +19,8 @@ elif [ "${provider}" == "premiumize" ]; then
 	debrid_api_key=$(op read "op://Personal/Premiumize.me/API Key")
 elif [ "${provider}" == "debridlink" ]; then
 	debrid_api_key=$(op read "op://Personal/sbu7y6nvqvcx3inmrodr6436ce/credential")
+elif [ "${provider}" == "alldebrid" ]; then
+	debrid_api_key=$(op read "op://Personal/cesntgi2zvhhiek4dkqbojr47u/Stremio API Key")
 else
 	echo "Invalid provider: ${provider}"
 	exit 1
