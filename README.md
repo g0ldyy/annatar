@@ -53,7 +53,7 @@ curl -LJO https://gitlab.com/stremio-add-ons/annatar/-/raw/master/docker-compose
 docker-compose up -d jackett
 ```
 
-Open http://localhost:9117 and add some indexers. I recommend the ones pictured below for almost all TV and Movies. They are the fastest providers. If someone wants to suggest others open a PR (i.e. anime indexers). 
+Open http://localhost:9117 and add some indexers. 
 
 ![](https://i.imgur.com/gYPNEyM.png)
 
@@ -70,10 +70,6 @@ Install the add-on to Stremio:
    ![](./img/configure.png)
 
 3. This will launch the plugin the Stremio app. 
-
-## This is not Torrentio
-
-Torrentio provides instant results because it uses a crawler to cache content from indexers. All searches against the Torrentio add-on yield results from cached content. While this provides instant results it comes at a cost. Sometimes that [cost is downtime](https://www.reddit.com/r/StremioAddons/comments/1acl7ss/torrentio_faq/), but it also means that Torrentio caches much more than I need or care to know about. Also, because of this added complexity it is [non-trivial](https://github.com/Gabisonfire/knightcrawler) to self-host Torrentio. 
 
 
 
