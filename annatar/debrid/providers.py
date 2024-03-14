@@ -18,6 +18,10 @@ def register_provider(prov: "DebridService"):
     _providers.append(prov)
 
 
+def all_providers() -> list[DebridService]:
+    return _providers
+
+
 def list_providers() -> list[dict[str, str]]:
     return [{"id": p.id(), "name": p.name()} for p in _providers]
 
