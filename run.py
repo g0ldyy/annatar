@@ -31,6 +31,15 @@ def start_torrent_processor(worker_id: int) -> None:
     loop.close()
 
 
+def start_community_cache_processor() -> None:
+    from annatar.pubsub.consumers.community_cache import CommunityCacheProcessor
+
+    loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(CommunityCacheProcessor().run(WORKERS))
+    loop.close()
+
+
 def start_search_processor(indexer: str) -> None:
     from annatar.pubsub.consumers.torrent_search.base_jackett_processor import BaseJackettProcessor
 
@@ -55,6 +64,14 @@ if __name__ == "__main__":
             args=(worker_id,),
             daemon=True,
             name=f"torrent-processor-{worker_id}",
+        )
+        thread.start()
+
+    if config.ENABLE_COMMUNITY_CACHE:
+        thread: threading.Thread = threading.Thread(
+            target=start_community_cache_processor,
+            daemon=True,
+            name="community-cache-processor",
         )
         thread.start()
 
