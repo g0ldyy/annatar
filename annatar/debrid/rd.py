@@ -220,11 +220,6 @@ async def get_stream_link(
     episode: int = 0,
 ) -> StreamLink | None:
     info_hash = info_hash.upper()
-    cache_key: str = f"rd:stream_link:torrent:{info_hash}:{season}:{episode}"
-    if cache := await db.get_model(cache_key, model=StreamLink):
-        log.debug("Cached stream link found", link=cache)
-        return cache
-
     async for cached_files in api.get_instant_availability(
         info_hash,
         debrid_token,
@@ -271,13 +266,11 @@ async def get_stream_link(
             ttl=timedelta(hours=8),
         )
 
-        stream_link = StreamLink(
+        return StreamLink(
             size=file.filesize,
             name=file.filename,
             url=url,
         )
-        await db.set_model(cache_key, stream_link, ttl=timedelta(hours=8))
-        return stream_link
     return None
 
 
