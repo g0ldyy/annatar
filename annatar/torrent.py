@@ -214,6 +214,8 @@ class TorrentMeta(BaseModel):
             return -1000
         if self.is_trash():
             return -5000
+        if self.year and year and year not in self.year:
+            return -2000
 
         season_match_score = (
             self.score_series(season=season, episode=episode) << SEASON_MATCH_BIT_POS
