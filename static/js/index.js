@@ -29,8 +29,7 @@ function getFormData(e) {
 
 function updateFormDataDisplay(e) {
 	var formData = getFormData(e);
-	document.getElementById('formDataDisplay').value =
-		document.URL.replace("/configure", `/${formData}/manifest.json`);
+	document.getElementById('formDataDisplay').value = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/${formData}/manifest.json`;
 }
 
 document.addEventListener('DOMContentLoaded', function () {
