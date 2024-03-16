@@ -38,6 +38,15 @@ async def make_request(
             method, api_url, headers=api_headers, data=body
         ) as response:
             status_code = f"{response.status//100}xx"
+            if response.status in [401, 403]:
+                log.warning(
+                    "RD token is invalid",
+                    status=response.status,
+                    reason=response.reason,
+                    url=api_url,
+                    body=await response.text(),
+                )
+                return None
             if response.status not in range(200, 300):
                 error = True
                 log.error(
