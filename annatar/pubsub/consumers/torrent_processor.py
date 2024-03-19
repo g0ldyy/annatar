@@ -82,12 +82,18 @@ async def process_message(result: TorrentSearchResult):
 
     ttl = timedelta(weeks=8)
     if result.search_criteria.category == Category.Movie:
-        await process_movie(torrent, criteria, ttl)
+        await process_movie(torrent, result.indexer, result.size, criteria, ttl)
     else:
-        await process_show(torrent, criteria, ttl)
+        await process_show(torrent, result.indexer, result.size, criteria, ttl)
 
 
-async def process_movie(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: timedelta):
+async def process_movie(
+    torrent: Torrent,
+    indexer: str,
+    size: int,
+    criteria: TorrentSearchCriteria,
+    ttl: timedelta,
+):
     score = torrent.match_score(title=torrent.title, year=criteria.year)
     if score > 0:
         await odm.add_torrent(
@@ -95,11 +101,20 @@ async def process_movie(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: 
             title=torrent.raw_title,
             imdb=criteria.imdb,
             score=score,
+            size=size,
             ttl=ttl,
+            indexer=indexer,
+            category=Category.Movie,
         )
 
 
-async def process_show(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: timedelta):
+async def process_show(
+    torrent: Torrent,
+    indexer: str,
+    size: int,
+    criteria: TorrentSearchCriteria,
+    ttl: timedelta,
+):
     if not torrent.episode:
         for season in torrent.season:
             score = torrent.match_score(title=torrent.title, year=criteria.year, season=season)
@@ -110,6 +125,9 @@ async def process_show(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: t
                 score=score,
                 ttl=ttl,
                 season=season,
+                category=Category.Series,
+                indexer=indexer,
+                size=size,
             )
     elif torrent.season:
         for season, episode in product(torrent.season, torrent.episode):
@@ -128,6 +146,9 @@ async def process_show(torrent: Torrent, criteria: TorrentSearchCriteria, ttl: t
                     ttl=ttl,
                     season=season,
                     episode=episode,
+                    category=Category.Series,
+                    indexer=indexer,
+                    size=size,
                 )
 
 

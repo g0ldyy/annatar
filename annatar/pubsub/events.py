@@ -46,10 +46,11 @@ class TorrentSearchResult(BaseModel):
     info_hash: str = ""
     title: str
     guid: str
+    indexer: str
     imdb: str = ""
     magnet_link: str = ""
     tracker: str = ""
-    Size: int = 0
+    size: int = 0
     languages: list[str] = []
     subs: list[str] = []
     year: int = 0
@@ -83,6 +84,9 @@ class TorrentAdded(BaseModel):
     info_hash: str
     title: str
     imdb: str
+    size: int
+    indexer: str
+    category: str
     season: int | None = None
     episode: int | None = None
 

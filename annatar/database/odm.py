@@ -42,6 +42,9 @@ async def add_torrent(
     imdb: str,
     score: int,
     ttl: timedelta,
+    category: str,
+    size: int,
+    indexer: str,
     season: int | None = None,
     episode: int | None = None,
 ) -> bool:
@@ -61,6 +64,9 @@ async def add_torrent(
                 imdb=imdb,
                 season=season,
                 episode=episode,
+                category=category,
+                size=size,
+                indexer=indexer,
             )
         )
     return bool(added)
