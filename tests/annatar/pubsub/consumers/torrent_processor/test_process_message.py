@@ -34,6 +34,7 @@ def mock_search_result(title: str) -> TorrentSearchResult:
         imdb=imdb,
         year=meta.year[0] if meta.year else 0,
         category=[5000],
+        indexer="mock",
         search_criteria=TorrentSearchCriteria(
             query=meta.title,
             imdb=imdb,
