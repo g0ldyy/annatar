@@ -46,7 +46,7 @@ class TorrentSearchResult(BaseModel):
     info_hash: str = ""
     title: str
     guid: str
-    indexer: str
+    indexer: str = ""
     imdb: str = ""
     magnet_link: str = ""
     tracker: str = ""
