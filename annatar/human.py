@@ -51,9 +51,9 @@ def bytes(num: float) -> str:
     """
     for unit in ("", "K", "M"):
         if abs(num) < 1024.0:
-            return f"{num:3.2f}{unit}B"
+            return f"{num:3.2f} {unit}B"
         num /= 1024.0
-    return f"{num:.2f}GB"
+    return f"{num:.2f} GB"
 
 
 def match_season(season: int, file: str) -> bool:
