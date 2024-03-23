@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 import structlog
@@ -29,7 +30,9 @@ async def search_all(
     season: int | None = None,
     episode: int | None = None,
 ) -> list[SearchResult]:
-    if not db.try_lock(f"search:{imdb}:{category}:{season}:{episode}", timeout=timedelta(hours=1)):
+    if not await db.try_lock(
+        f"search:{imdb}:{category}:{season}:{episode}", timeout=timedelta(hours=1)
+    ):
         log.debug("search results are fresh, not searching again")
         return []
 
@@ -37,9 +40,44 @@ async def search_all(
     if not media_info:
         return []
 
-    results: list[asyncio.Task] = [
-        asyncio.create_task(indexer.search(media_info, imdb, category, season, episode))
-        for indexer in ALL
-    ]
+    log.info("searching indexers", imdb=imdb, category=category, season=season, episode=episode)
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        loop = asyncio.get_event_loop()
+        results: list[asyncio.Future] = [
+            loop.run_in_executor(
+                executor,
+                _search_one,
+                media_info,
+                indexer,
+                imdb,
+                category,
+                season,
+                episode,
+            )
+            for indexer in ALL
+        ]
+        log.debug("searching gathering search results")
+        return await asyncio.gather(*results)
 
-    return await asyncio.gather(*results)
+
+def _search_one(
+    media_info: cinemeta.MediaInfo,
+    indexer: JackettIndexer,
+    imdb: str,
+    category: Category,
+    season: int | None = None,
+    episode: int | None = None,
+):
+    loop = asyncio.new_event_loop()
+    try:
+        coro = indexer.search(
+            media_info=media_info,
+            imdb=imdb,
+            category=category,
+            season=season,
+            episode=episode,
+        )
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()

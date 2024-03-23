@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Annotated, Any, Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Path, Query, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.status import HTTP_302_FOUND
 
@@ -17,6 +17,8 @@ from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService, get_provider
 from annatar.debrid.real_debrid_provider import RealDebridProvider
 from annatar.stremio import StreamResponse
+from annatar.tasks.process_search import process_search
+from annatar.torrent import Category
 
 router = APIRouter()
 
@@ -198,6 +200,7 @@ async def get_rd_stream(
     response_model_exclude_none=True,
 )
 async def list_streams(
+    bg: BackgroundTasks,
     request: Request,
     type: MediaType,
     id: Annotated[
@@ -225,6 +228,13 @@ async def list_streams(
 
     imdb_id: str = id.split(":")[0]
     season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
+    bg.add_task(
+        process_search,
+        imdb_id,
+        Category.Movie if type == "movie" else Category.Series,
+        season_episode[0] if season_episode else None,
+        season_episode[1] if len(season_episode) > 1 else None,
+    )
     res: StreamResponse = await streams.search(
         type=type,
         debrid=debrid,

@@ -3,7 +3,6 @@ import contextlib
 import math
 import os
 from collections import defaultdict
-from datetime import timedelta
 from itertools import chain
 
 import structlog
@@ -131,20 +130,6 @@ async def get_stream_links(
         episode=episode,
         filters=filters,
     )
-    log.debug("done retrieving torrents from cache", count=len(torrents))
-    if len(torrents) == 0:
-        is_stale = await db.try_lock(f"stream_links:{imdb}:{season}", timeout=timedelta(hours=1))
-        if is_stale:
-            log.info(
-                "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
-            )
-            await wait_for_new_torrents(imdb, season, episode, max_results)
-            torrents = await odm.list_torrents(
-                imdb=imdb,
-                season=season,
-                episode=episode,
-                filters=filters,
-            )
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0

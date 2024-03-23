@@ -1,7 +1,7 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 import structlog
+from structlog.contextvars import bound_contextvars
 
 from annatar.clients import cinemeta
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
@@ -18,21 +18,18 @@ async def process_search(
     season: int | None = None,
     episode: int | None = None,
 ):
-    media_info = await cinemeta.get_media_info(imdb, category)
-    if not media_info:
-        log.info("No media info found", imdb=imdb, category=category)
-        return
+    with bound_contextvars(imdb=imdb, category=category, season=season, episode=episode):
+        media_info = await cinemeta.get_media_info(imdb, category)
+        if not media_info:
+            log.info("No media info found")
+            return
 
-    log.info("Searching for torrent", imdb=imdb, category=category, season=season, episode=episode)
-    torrents = await search_all(imdb, category, season, episode)
+        log.info("Searching for torrent")
+        torrents = await search_all(imdb, category, season, episode)
+        log.info("Got search results", count=len(torrents))
 
-    max_workers: int = 10
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        loop = asyncio.get_running_loop()
-        await asyncio.gather(
-            loop.run_in_executor(
-                executor,
-                process_search_result,
+        tasks = [
+            process_search_result(
                 TorrentSearchResult(
                     title=torrent.Title,
                     info_hash=torrent.InfoHash if torrent.InfoHash else "",
@@ -46,7 +43,22 @@ async def process_search(
                         query=media_info.name,
                         year=media_info.release_year or 0,
                     ),
-                ),
+                )
             )
             for torrent in torrents
-        )
+        ]
+        log.debug("gathering...")
+        await asyncio.gather(*tasks)
+        log.info("completed search")
+
+
+def _process_search_result(result: TorrentSearchResult):
+    log.debug("Processing search result", result=result.title)
+    loop = asyncio.new_event_loop()
+    try:
+        coro = process_search_result(result)
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        log.debug("completed search processing, closing loop")
+        loop.close()

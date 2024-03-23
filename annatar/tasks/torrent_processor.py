@@ -13,10 +13,11 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
-MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
+MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT") or 30)
 
 
 async def process_search_result(result: TorrentSearchResult):
+    log.info("processing search result", result=result)
     criteria = result.search_criteria
     if result.imdb and criteria.imdb and result.imdb != criteria.imdb:
         log.info("skipping mismatched IMDB", wanted=criteria.imdb, got=result.imdb)

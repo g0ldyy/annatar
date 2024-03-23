@@ -34,7 +34,7 @@ class SearchQuery(BaseModel):
 
 
 class SearchResult(BaseModel):
-    Indexer: str
+    Indexer: str = ""
     Tracker: Optional[str] = None
     TrackerId: Optional[str] = None
     Title: str
