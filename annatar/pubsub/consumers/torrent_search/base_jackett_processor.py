@@ -6,67 +6,21 @@ import structlog
 from pydantic import BaseModel
 
 from annatar.clients import jackett
-from annatar.clients.cinemeta import MediaInfo, get_media_info
+from annatar.clients.cinemeta import MediaInfo
 from annatar.clients.jackett_models import SearchResult
-from annatar.database import db
 from annatar.pubsub.events import SearchRequest, TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
-JACKETT_TIMEOUT = 60
+JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT") or 7)
 JACKETT_MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 100))
-JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 6))
 
 
 class BaseJackettProcessor(BaseModel):
     indexer: str
     supports_imdb: bool
-    num_workers: int
-    queue_size: int
     categories: list[Category]
-
-    async def run(self):
-        workers: list[asyncio.Task] = []
-        while True:
-            try:
-                queue: asyncio.Queue[SearchRequest] = asyncio.Queue(maxsize=self.queue_size)
-
-                workers = [
-                    asyncio.create_task(
-                        self.process_queue(queue),
-                        name=f"{self.indexer}-search-processor-{i}",
-                    )
-                    for i in range(self.num_workers)
-                ] + [asyncio.create_task(SearchRequest.listen(queue, self.indexer))]
-
-                await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
-                log.error("search processor completed?", indexer=self.indexer)
-            except asyncio.CancelledError:
-                return
-            except Exception as e:
-                log.error("search processor stopped unexpectedly", indexer=self.indexer, exc_info=e)
-                raise
-            finally:
-                for worker in workers:
-                    if not worker.done():
-                        worker.cancel()
-
-    async def process_queue(self, queue: asyncio.Queue[SearchRequest]):
-        while request := await queue.get():
-            try:
-                key = f"{self.indexer}-search-processor-{request.imdb}"
-                if not await db.try_lock(key, jackett.JACKETT_CACHE_MINUTES):
-                    continue
-                media_info = await get_media_info(request.imdb, request.category)
-                if not media_info:
-                    continue
-                await self.process_message(request, media_info)
-            except asyncio.CancelledError:
-                return
-            except Exception as e:
-                log.error("search processor stopped unexpectedly", indexer=self.indexer, exc_info=e)
-                await asyncio.sleep(1)
 
     async def process_message(
         self,

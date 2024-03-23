@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Path, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Path, Query, Request
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
@@ -13,7 +13,7 @@ from annatar import stremio
 from annatar.api.core import streams
 from annatar.database import db, odm
 from annatar.debrid.providers import all_providers, get_provider
-from annatar.pubsub import events
+from annatar.tasks.process_search import process_search
 from annatar.torrent import Category
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -74,6 +74,7 @@ async def search_cached_imdb(
 
 @router.get("/imdb/{category}/{imdb_id}")
 async def search_imdb(
+    bg: BackgroundTasks,
     imdb_id: Annotated[str, Path(description="IMDB ID", examples=["tt0120737"], regex=r"^tt\d+$")],
     category: Annotated[Category, Path(description="Category", examples=["movie", "series"])],
     season: Annotated[int | None, Query(description="Season")] = None,
@@ -81,14 +82,7 @@ async def search_imdb(
     limit: Annotated[int, Query(description="Limit results")] = 10,
     timeout: Annotated[int, Query(description="Search timeout", le=10, ge=1)] = 10,
 ) -> MediaResponse:
-    await events.SearchRequest.publish(
-        request=events.SearchRequest(
-            imdb=imdb_id,
-            category=category,
-            season=season,
-            episode=episode,
-        )
-    )
+    bg.add_task(process_search, imdb_id, category, season, episode)
 
     torrents: list[str] = await odm.list_torrents(
         imdb=imdb_id,
@@ -112,7 +106,7 @@ async def search_imdb(
                 ),
             )
 
-    mapped = await asyncio.gather(*[build_media(info_hash) for info_hash in torrents])
+    mapped = await asyncio.gather(build_media(info_hash) for info_hash in torrents)
     return MediaResponse(media=[media for media in mapped if media is not None])
 
 

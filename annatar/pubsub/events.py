@@ -19,19 +19,6 @@ class SearchRequest(BaseModel):
     season: int | None = None
     episode: int | None = None
 
-    @staticmethod
-    async def listen(queue: asyncio.Queue["SearchRequest"], consumer: str):
-        await pubsub.consume_topic(
-            topic=Topic.SearchRequest,
-            model=SearchRequest,
-            queue=queue,
-            consumer=consumer,
-        )
-
-    @staticmethod
-    async def publish(request: "SearchRequest") -> int:
-        return await pubsub.publish(Topic.SearchRequest, request.model_dump_json())
-
 
 class TorrentSearchCriteria(BaseModel):
     imdb: str
@@ -42,7 +29,6 @@ class TorrentSearchCriteria(BaseModel):
 
 class TorrentSearchResult(BaseModel):
     search_criteria: TorrentSearchCriteria
-    category: list[int] = []
     info_hash: str = ""
     title: str
     guid: str

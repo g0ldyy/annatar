@@ -17,7 +17,7 @@ from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
 from annatar.pubsub import events
 from annatar.stremio import Stream, StreamResponse
-from annatar.torrent import Category, TorrentMeta
+from annatar.torrent import TorrentMeta
 
 log = structlog.get_logger(__name__)
 
@@ -30,7 +30,7 @@ UNIQUE_SEARCHES: Counter = Counter(
 
 
 async def _search(
-    type: str,
+    type: str,  # noqa: ARG001
     max_results: int,
     debrid: DebridService,
     imdb_id: str,
@@ -43,14 +43,6 @@ async def _search(
         log.debug("unique search")
         UNIQUE_SEARCHES.inc()
 
-    await events.SearchRequest.publish(
-        events.SearchRequest(
-            imdb=imdb_id,
-            category=Category(type),
-            season=season_episode[0] if len(season_episode) == 2 else None,
-            episode=season_episode[1] if len(season_episode) == 2 else None,
-        )
-    )
     log.info("searching for stream links")
 
     stream_links: list[StreamLink] = await get_stream_links(

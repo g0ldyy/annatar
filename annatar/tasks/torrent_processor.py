@@ -14,60 +14,9 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 log = structlog.get_logger(__name__)
 
 MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
-TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "10000"))
 
 
-class TorrentProcessor:
-    @staticmethod
-    async def run(num_workers: int = 1):
-        while True:
-            workers: list[asyncio.Task] = []
-            try:
-                queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
-                    maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
-                )
-                workers = [
-                    asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
-                    for i in range(num_workers)
-                ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
-
-                await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
-
-                log.error("torrent processor worker exited unexpectedly", tasks=workers)
-            except asyncio.exceptions.CancelledError:
-                break
-            except Exception as err:
-                log.error("torrent processor error", exc_info=err)
-                await asyncio.sleep(5)
-            finally:
-                for w in workers:
-                    if not w.done():
-                        w.cancel()
-
-
-async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
-    while True:
-        result: TorrentSearchResult = await queue.get()
-        if not result:
-            continue
-        try:
-            if await db.try_lock(
-                f"lock:torrent_processor:{result.guid}", timeout=timedelta(minutes=60)
-            ):
-                log.debug("processing torrent", torrent=result.info_hash or result.guid)
-                await process_message(result)
-                log.debug("finished processing torrent", torrent=result.info_hash or result.guid)
-        except asyncio.exceptions.CancelledError:
-            break
-        except Exception as err:
-            log.error("torrent processor error", exc_info=err)
-            await asyncio.sleep(5)
-        finally:
-            if result:
-                queue.task_done()
-
-
-async def process_message(result: TorrentSearchResult):
+async def process_search_result(result: TorrentSearchResult):
     criteria = result.search_criteria
     if result.imdb and criteria.imdb and result.imdb != criteria.imdb:
         log.info("skipping mismatched IMDB", wanted=criteria.imdb, got=result.imdb)
