@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 import structlog
 from structlog.contextvars import bound_contextvars
@@ -24,32 +25,27 @@ async def process_search(
             log.info("No media info found")
             return
 
-        log.info("Searching for torrent")
-        torrents = await search_all(imdb, category, season, episode)
-        log.info("Got search results", count=len(torrents))
-
-        tasks = [
-            process_search_result(
-                TorrentSearchResult(
-                    title=torrent.Title,
-                    info_hash=torrent.InfoHash if torrent.InfoHash else "",
-                    guid=torrent.Guid,
-                    magnet_link=torrent.Link or "",
-                    indexer=torrent.Indexer,
-                    size=torrent.Size,
-                    search_criteria=TorrentSearchCriteria(
-                        category=category,
-                        imdb=imdb,
-                        query=media_info.name,
-                        year=media_info.release_year or 0,
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            async for torrent in search_all(imdb, category, season, episode):
+                log.info("processing torrent")
+                executor.submit(
+                    process_search_result,
+                    TorrentSearchResult(
+                        title=torrent.Title,
+                        info_hash=torrent.InfoHash if torrent.InfoHash else "",
+                        guid=torrent.Guid,
+                        magnet_link=torrent.Link or "",
+                        indexer=torrent.Indexer,
+                        size=torrent.Size,
+                        search_criteria=TorrentSearchCriteria(
+                            category=category,
+                            imdb=imdb,
+                            query=media_info.name,
+                            year=media_info.release_year or 0,
+                        ),
                     ),
                 )
-            )
-            for torrent in torrents
-        ]
-        log.debug("gathering...")
-        await asyncio.gather(*tasks)
-        log.info("completed search")
+        log.debug("completed search")
 
 
 def _process_search_result(result: TorrentSearchResult):

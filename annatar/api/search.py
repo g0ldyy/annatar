@@ -1,11 +1,12 @@
 import asyncio
 import contextlib
 import os
+import threading
 from datetime import timedelta
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Path, Query, Request
+from fastapi import APIRouter, Path, Query, Request
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
@@ -74,7 +75,6 @@ async def search_cached_imdb(
 
 @router.get("/imdb/{category}/{imdb_id}")
 async def search_imdb(
-    bg: BackgroundTasks,
     imdb_id: Annotated[str, Path(description="IMDB ID", examples=["tt0120737"], regex=r"^tt\d+$")],
     category: Annotated[Category, Path(description="Category", examples=["movie", "series"])],
     season: Annotated[int | None, Query(description="Season")] = None,
@@ -82,7 +82,10 @@ async def search_imdb(
     limit: Annotated[int, Query(description="Limit results")] = 10,
     timeout: Annotated[int, Query(description="Search timeout", le=10, ge=1)] = 10,
 ) -> MediaResponse:
-    bg.add_task(process_search, imdb_id, category, season, episode)
+    threading.Thread(
+        target=process_search,
+        args=(imdb_id, category, season, episode),
+    ).start()
 
     torrents: list[str] = await odm.list_torrents(
         imdb=imdb_id,

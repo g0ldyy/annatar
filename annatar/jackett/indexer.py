@@ -69,6 +69,7 @@ class JackettIndexer(BaseModel):
                 results,
                 key=lambda result: self.prioritize_search_result(media_info, result, imdb, season),
             )
+            log.debug("sorted search results", results=len(sorted_results))
             return sorted_results[:JACKETT_MAX_RESULTS]
 
     def prioritize_search_result(
