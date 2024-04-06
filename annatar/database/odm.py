@@ -12,7 +12,6 @@ import structlog
 from annatar import torrent
 from annatar.api.filters import Filter
 from annatar.database import db
-from annatar.pubsub.events import TorrentAdded
 
 log = structlog.get_logger(__name__)
 
@@ -48,6 +47,8 @@ async def add_torrent(
     season: int | None = None,
     episode: int | None = None,
 ) -> bool:
+    # XXX Publish these for KC
+    _ = category, size, indexer
     added = await db.unique_list_add(
         name=Keys.torrents(imdb, season, episode),
         item=info_hash,
@@ -57,18 +58,6 @@ async def add_torrent(
     if added:
         log.debug("added torrent", info_hash=info_hash, title=title, imdb=imdb)
         await set_torrent_title(info_hash, title)
-        await TorrentAdded.publish(
-            TorrentAdded(
-                info_hash=info_hash,
-                title=title,
-                imdb=imdb,
-                season=season,
-                episode=episode,
-                category=category,
-                size=size,
-                indexer=indexer,
-            )
-        )
     return bool(added)
 
 

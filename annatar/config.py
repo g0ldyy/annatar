@@ -15,6 +15,9 @@ DEFAULT_INDEXERS = (
 )
 
 
+NAMESPACE: str = os.getenv("NAMESPACE") or "annatar"
+NUM_CORES: int = os.cpu_count() or 1
+WORKERS = int(os.getenv("WORKERS") or 2 * NUM_CORES)
 APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
 APP_NAME = os.getenv("APP_NAME", "Annatar")
 BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")

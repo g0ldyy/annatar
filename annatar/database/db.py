@@ -16,10 +16,10 @@ log = structlog.get_logger(__name__)
 
 
 DB_PATH = os.environ.get("DB_PATH", "annatar.db")
-REDIS_URL = os.environ.get("REDIS_URL", "")
+REDIS_HOST = os.environ.get("REDIS_HOST", "")
 REDIS_FLAGS = {"socket_timeout": 3.0, "socket_connect_timeout": 3.0}
 redis: StrictRedis = (
-    StrictRedis(host=REDIS_URL, **REDIS_FLAGS) if REDIS_URL else StrictRedis(DB_PATH, **REDIS_FLAGS)
+    StrictRedis(host=REDIS_HOST, **REDIS_FLAGS) if REDIS_HOST else StrictRedis(DB_PATH, **REDIS_FLAGS)
 )
 
 REQUEST_DURATION = Histogram(
@@ -300,7 +300,7 @@ async def lock(key: str) -> AsyncLockManager:
     return AsyncLockManager(redis, key)
 
 
-if REDIS_URL:
-    log.info("connected to redis", host=REDIS_URL)
+if REDIS_HOST:
+    log.info("connected to redis", host=REDIS_HOST)
 else:
     log.info("running with local redis", storage=DB_PATH)
