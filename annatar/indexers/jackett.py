@@ -14,7 +14,7 @@ from annatar.indexers import curator
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, TorrentMeta
 
-search_queue = Queue(f"search-{config.NAMESPACE}", connection=db.redis)
+search_queue = Queue(f"annatar:{config.NAMESPACE}:search", connection=db.redis)
 
 log = structlog.get_logger(__name__)
 

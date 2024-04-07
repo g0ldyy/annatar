@@ -1,5 +1,8 @@
-#!/bin/bash
+#!/package/admin/s6-overlay/command/with-contenv sh
 
-with-contenv rq worker-pool -n ${WORKERS:-5} \
+cd /app
+
+exec rq worker-pool \
+	-n ${WORKERS:-5} \
 	annatar:${NAMESPACE:-annatar}:search \
 	annatar:${NAMESPACE:-annatar}:curator

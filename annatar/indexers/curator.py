@@ -16,7 +16,7 @@ log = structlog.get_logger(__name__)
 
 MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
 
-_curator_queue: Queue = Queue(f"curator-{config.NAMESPACE}", connection=db.redis)
+_curator_queue: Queue = Queue(f"annatar:{config.NAMESPACE}:curator", connection=db.redis)
 
 
 def process(result: TorrentSearchResult):
