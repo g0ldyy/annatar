@@ -1,0 +1,5 @@
+#!/bin/bash
+
+with-contenv rq worker-pool -n ${WORKERS:-5} \
+	annatar:${NAMESPACE:-annatar}:search \
+	annatar:${NAMESPACE:-annatar}:curator

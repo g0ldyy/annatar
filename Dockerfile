@@ -30,6 +30,20 @@ RUN poetry build
 # --- Final Stage ---
 FROM python:3.11-slim as final
 
+# Setup s6-overlay
+RUN apt-get update && apt-get install -y nginx xz-utils
+ARG S6_OVERLAY_VERSION=3.1.6.2
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-symlinks-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-symlinks-noarch.tar.xz
+RUN mkdir -p /etc/services.d/annatar /etc/services.d/annatar-workers
+COPY s6/services.d/annatar /etc/services.d/
+COPY s6/services.d/annatar-workers /etc/services.d/
+RUN find /etc/services.d/annatar* -type f -exec chmod -v a+rwx {} \;
+
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -58,4 +72,4 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 
 COPY entrypoint.sh /app/entrypoint.sh
 
-CMD ["sh", "/app/entrypoint.sh"]
+ENTRYPOINT ["/init"]
