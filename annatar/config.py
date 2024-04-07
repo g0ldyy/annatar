@@ -1,7 +1,7 @@
 import json
 import os
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import structlog
 from pydantic import BaseModel, ValidationError, root_validator
@@ -31,6 +31,10 @@ PROM_DIR = os.getenv(
 VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
 
 RESOLUTION_FILTERS = [f for f in by_category("Resolution")]
+
+JACKETT_CACHE_MINUTES = timedelta(minutes=int(os.environ.get("JACKETT_CACHE_MINUTES", "60")))
+JACKETT_TIMEOUT = int(os.getenv("JACKETT_TIMEOUT") or 60)
+JACKETT_MAX_RESULTS = int(os.getenv("JACKETT_MAX_RESULTS") or 100)
 
 
 class UserConfig(BaseModel):

@@ -15,7 +15,6 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 log = structlog.get_logger(__name__)
 
 MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
-TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "10000"))
 
 _curator_queue: Queue = Queue(f"curator-{config.NAMESPACE}", connection=db.redis)
 
@@ -32,6 +31,9 @@ async def _process(result: TorrentSearchResult):
         return
     torrent: Torrent | None = await map_search_result(result)
     if not torrent:
+        return
+    if await odm.get_torrent_meta(torrent.info_hash):
+        log.debug("torrent already in database", info_hash=torrent.info_hash)
         return
 
     if result.imdb != criteria.imdb and not torrent.matches_name(criteria.query):

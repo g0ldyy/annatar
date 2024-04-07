@@ -1,5 +1,5 @@
 import asyncio
-import os
+from datetime import datetime, timezone
 from itertools import chain
 
 import structlog
@@ -19,10 +19,6 @@ search_queue = Queue(f"search-{config.NAMESPACE}", connection=db.redis)
 log = structlog.get_logger(__name__)
 
 
-JACKETT_TIMEOUT = int(os.getenv("JACKETT_TIMEOUT") or 60)
-JACKETT_MAX_RESULTS = int(os.getenv("JACKETT_MAX_RESULTS") or 100)
-
-
 async def trigger_search(
     imdb: str,
     category: Category,
@@ -32,6 +28,16 @@ async def trigger_search(
     media_info: MediaInfo | None = await cinemeta.get_media_info(imdb, category.value)
     if not media_info:
         return
+
+    # exponential backoff based on the age of the media in years
+    now = datetime.now(tz=timezone.utc).year
+    release_year = media_info.release_year or now
+    age = now - release_year
+    cache_time = config.JACKETT_CACHE_MINUTES * 2**age
+    if not await db.try_lock(f"annatar:search:{imdb}", cache_time):
+        log.debug("results are still fresh", imdb=imdb, release_year=media_info.release_year)
+        return
+
     for indexer in config.JACKETT_INDEXERS_LIST:
         search_queue.enqueue(
             search_indexer,
@@ -65,13 +71,13 @@ async def search_indexer(
             imdb=imdb,
             indexers=[indexer],
             category=category,
-            timeout=JACKETT_TIMEOUT,
+            timeout=config.JACKETT_TIMEOUT,
         ),
         jackett.search(
             query=media_info.name,
             indexers=[indexer],
             category=category,
-            timeout=JACKETT_TIMEOUT,
+            timeout=config.JACKETT_TIMEOUT,
         ),
     ]
     if season:
@@ -80,7 +86,7 @@ async def search_indexer(
                 query=f"{media_info.name} S{season:02d}",
                 indexers=[indexer],
                 category=category,
-                timeout=JACKETT_TIMEOUT,
+                timeout=config.JACKETT_TIMEOUT,
             )
         )
 
@@ -94,8 +100,8 @@ async def search_indexer(
     sorted_results = sorted(
         results, key=lambda x: prioritize_search_result(media_info, imdb, x, season)
     )
-    for result in sorted_results[:JACKETT_MAX_RESULTS]:
-        publish_search_result(indexer, category, imdb, result, media_info)
+    for result in sorted_results[: config.JACKETT_MAX_RESULTS]:
+        queue_search_result(indexer, category, imdb, result, media_info)
 
 
 def prioritize_search_result(
@@ -111,7 +117,7 @@ def prioritize_search_result(
     return (score, result.Size * -1)
 
 
-def publish_search_result(
+def queue_search_result(
     indexer,
     category: Category,
     imdb: str,

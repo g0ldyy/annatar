@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Type, TypeVar
 
 import aiohttp
@@ -11,7 +11,7 @@ from prometheus_client import Histogram
 from pydantic import BaseModel
 from structlog.contextvars import bound_contextvars
 
-from annatar import instrumentation
+from annatar import config, instrumentation
 from annatar.clients.jackett_models import SearchResponse
 from annatar.database import db
 from annatar.torrent import Category
@@ -21,7 +21,6 @@ log = structlog.get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 JACKETT_API_KEY: str = os.environ.get("JACKETT_API_KEY", "")
-JACKETT_CACHE_MINUTES = timedelta(minutes=int(os.environ.get("JACKETT_CACHE_MINUTES", "15")))
 JACKETT_URL: str = os.environ.get("JACKETT_URL", "http://localhost:9117")
 
 REQUEST_DURATION = Histogram(
@@ -151,7 +150,7 @@ async def make_request(
                 if response.status == 200:
                     raw: dict[str, Any] = await response.json()
                     res = model.model_validate(raw)
-                    await db.set_model(cache_key, res, JACKETT_CACHE_MINUTES)
+                    await db.set_model(cache_key, res, config.JACKETT_CACHE_MINUTES)
                     return res
 
                 body = await response.text()
