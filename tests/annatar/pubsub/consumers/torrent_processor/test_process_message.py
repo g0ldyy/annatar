@@ -1,4 +1,5 @@
 import unittest
+from hashlib import sha1
 from random import randint
 from unittest import mock
 from uuid import uuid4
@@ -19,6 +20,10 @@ from annatar.torrent import Category, TorrentMeta
 log = structlog.get_logger(__name__)
 
 
+def new_info_hash(s: str) -> str:
+    return sha1(s.encode()).hexdigest().upper()
+
+
 def mock_imdb() -> str:
     return f"tt{randint(1000000, 9999999)}"
 
@@ -28,7 +33,7 @@ def mock_search_result(title: str) -> TorrentSearchResult:
     imdb: str = mock_imdb()
     season: int = meta.season[0] if meta.season else 0
     return TorrentSearchResult(
-        info_hash=uuid4().hex,
+        info_hash=new_info_hash(title),
         title=title,
         guid=uuid4().hex,
         imdb=imdb,
@@ -163,7 +168,7 @@ class ResolveMagnetLink(unittest.IsolatedAsyncioTestCase):
     async def test_resolves_magnet_links(self):
         guid = uuid4().hex
         link = "https://example.tld"
-        info_hash = "87398YUHF9S786TEF7Y08OIUH3987"
+        info_hash = new_info_hash(guid)
         magnet_link = magnet.make_magnet_link(info_hash)
 
         with aioresponses() as mock_http:
@@ -178,7 +183,7 @@ class ResolveMagnetLink(unittest.IsolatedAsyncioTestCase):
 
     async def test_returns_existing_magnet_link(self):
         guid = uuid4().hex
-        info_hash = "87398YUHF9S786TEF7Y80OIUH3987"
+        info_hash = new_info_hash(guid)
         magnet_link = magnet.make_magnet_link(info_hash)
 
         with aioresponses() as mock_http:
