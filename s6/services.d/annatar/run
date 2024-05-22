@@ -1,0 +1,14 @@
+#!/package/admin/s6-overlay/command/with-contenv sh
+
+cd /app
+
+export PROMETHEUS_MULTIPROC_DIR="${PROMETHEUS_MULTIPROC_DIR:-/tmp/prometheus/metrics}"
+if [ -d "$PROMETHEUS_MULTIPROC_DIR" ]; then
+    rm -rf "$PROMETHEUS_MULTIPROC_DIR"
+fi
+mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+
+exec uvicorn "annatar.main:app" \
+	--workers ${WORKERS:-8} \
+	--port ${PORT:-8000} \
+	--host ${HOST:-0.0.0.0}

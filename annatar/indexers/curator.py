@@ -5,8 +5,9 @@ from itertools import product
 
 import aiohttp
 import structlog
+from rq import Queue
 
-from annatar import magnet
+from annatar import config, magnet
 from annatar.database import db, odm
 from annatar.pubsub.events import TorrentSearchCriteria, TorrentSearchResult
 from annatar.torrent import Category, Torrent, TorrentMeta
@@ -14,66 +15,25 @@ from annatar.torrent import Category, Torrent, TorrentMeta
 log = structlog.get_logger(__name__)
 
 MAGNET_RESOLVE_TIMEOUT = int(os.getenv("MAGNET_RESOLVE_TIMEOUT", "30"))
-TORRENT_PROCESSOR_MAX_QUEUE_DEPTH = int(os.getenv("TORRENT_PROCESSOR_MAX_QUEUE_DEPTH", "10000"))
+
+_curator_queue: Queue = Queue(f"annatar:{config.NAMESPACE}:curator", connection=db.redis)
 
 
-class TorrentProcessor:
-    @staticmethod
-    async def run(num_workers: int = 1):
-        while True:
-            workers: list[asyncio.Task] = []
-            try:
-                queue: asyncio.Queue[TorrentSearchResult] = asyncio.Queue(
-                    maxsize=TORRENT_PROCESSOR_MAX_QUEUE_DEPTH
-                )
-                workers = [
-                    asyncio.create_task(process_queue(queue), name=f"torrent_processor_{i}")
-                    for i in range(num_workers)
-                ] + [asyncio.create_task(TorrentSearchResult.listen(queue, "torrent_processor"))]
-
-                await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
-
-                log.error("torrent processor worker exited unexpectedly", tasks=workers)
-            except asyncio.exceptions.CancelledError:
-                break
-            except Exception as err:
-                log.error("torrent processor error", exc_info=err)
-                await asyncio.sleep(5)
-            finally:
-                for w in workers:
-                    if not w.done():
-                        w.cancel()
+def process(result: TorrentSearchResult):
+    _curator_queue.enqueue(_process, result)
 
 
-async def process_queue(queue: asyncio.Queue[TorrentSearchResult]):
-    while True:
-        result: TorrentSearchResult = await queue.get()
-        if not result:
-            continue
-        try:
-            if await db.try_lock(
-                f"lock:torrent_processor:{result.guid}", timeout=timedelta(minutes=60)
-            ):
-                log.debug("processing torrent", torrent=result.info_hash or result.guid)
-                await process_message(result)
-                log.debug("finished processing torrent", torrent=result.info_hash or result.guid)
-        except asyncio.exceptions.CancelledError:
-            break
-        except Exception as err:
-            log.error("torrent processor error", exc_info=err)
-            await asyncio.sleep(5)
-        finally:
-            if result:
-                queue.task_done()
-
-
-async def process_message(result: TorrentSearchResult):
+async def _process(result: TorrentSearchResult):
+    # XXX If title.endswith("..."): search title with hashlists.info
     criteria = result.search_criteria
     if result.imdb and criteria.imdb and result.imdb != criteria.imdb:
         log.info("skipping mismatched IMDB", wanted=criteria.imdb, got=result.imdb)
         return
     torrent: Torrent | None = await map_search_result(result)
     if not torrent:
+        return
+    if await odm.get_torrent_meta(torrent.info_hash):
+        log.debug("torrent already in database", info_hash=torrent.info_hash)
         return
 
     if result.imdb != criteria.imdb and not torrent.matches_name(criteria.query):

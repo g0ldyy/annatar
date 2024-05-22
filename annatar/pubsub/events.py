@@ -1,11 +1,8 @@
-import asyncio
 from typing import Any, TypeVar
 
 import structlog
 from pydantic import BaseModel, field_validator
 
-from annatar.pubsub import pubsub
-from annatar.pubsub.pubsub import Topic
 from annatar.torrent import Category
 
 log = structlog.get_logger(__name__)
@@ -18,19 +15,6 @@ class SearchRequest(BaseModel):
     category: Category
     season: int | None = None
     episode: int | None = None
-
-    @staticmethod
-    async def listen(queue: asyncio.Queue["SearchRequest"], consumer: str):
-        await pubsub.consume_topic(
-            topic=Topic.SearchRequest,
-            model=SearchRequest,
-            queue=queue,
-            consumer=consumer,
-        )
-
-    @staticmethod
-    async def publish(request: "SearchRequest") -> int:
-        return await pubsub.publish(Topic.SearchRequest, request.model_dump_json())
 
 
 class TorrentSearchCriteria(BaseModel):
@@ -66,19 +50,6 @@ class TorrentSearchResult(BaseModel):
             return v.upper()
         return v
 
-    @staticmethod
-    async def listen(queue: asyncio.Queue["TorrentSearchResult"], consumer: str):
-        await pubsub.consume_topic(
-            topic=Topic.TorrentSearchResult,
-            model=TorrentSearchResult,
-            queue=queue,
-            consumer=consumer,
-        )
-
-    @staticmethod
-    async def publish(result: "TorrentSearchResult") -> int:
-        return await pubsub.publish(Topic.TorrentSearchResult, result.model_dump_json())
-
 
 class TorrentAdded(BaseModel):
     info_hash: str
@@ -89,16 +60,3 @@ class TorrentAdded(BaseModel):
     category: str
     season: int | None = None
     episode: int | None = None
-
-    @staticmethod
-    async def listen(queue: asyncio.Queue["TorrentAdded"], consumer: str):
-        await pubsub.consume_topic(
-            topic=Topic.TorrentAdded,
-            model=TorrentAdded,
-            queue=queue,
-            consumer=consumer,
-        )
-
-    @staticmethod
-    async def publish(result: "TorrentAdded") -> int:
-        return await pubsub.publish(Topic.TorrentAdded, result.model_dump_json())

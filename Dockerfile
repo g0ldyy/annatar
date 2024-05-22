@@ -28,7 +28,20 @@ COPY annatar /app/annatar
 RUN poetry build
 
 # --- Final Stage ---
-FROM python:3.11-slim as final
+FROM python:3.11-slim-bullseye as final
+
+# Setup s6-overlay
+RUN apt-get update && apt-get install -y nginx xz-utils
+ARG S6_OVERLAY_VERSION=3.1.6.2
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
+
+COPY s6/services.d/annatar /etc/services.d/annatar
+COPY s6/services.d/annatar-workers /etc/services.d/annatar-workers
+RUN chmod a+x /etc/services.d/annatar/run && \
+	chmod a+x /etc/services.d/annatar-workers/run
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -56,6 +69,5 @@ COPY run.py /app/run.py
 ARG BUILD_VERSION=UNKNOWN
 ENV BUILD_VERSION=${BUILD_VERSION}
 
-COPY entrypoint.sh /app/entrypoint.sh
-
-CMD ["sh", "/app/entrypoint.sh"]
+ENTRYPOINT ["/init"]
+CMD []

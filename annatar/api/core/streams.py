@@ -1,9 +1,7 @@
 import asyncio
-import contextlib
 import math
 import os
 from collections import defaultdict
-from datetime import timedelta
 from itertools import chain
 
 import structlog
@@ -15,7 +13,7 @@ from annatar.api.filters import Filter
 from annatar.database import db, odm
 from annatar.debrid.models import StreamLink
 from annatar.debrid.providers import DebridService
-from annatar.pubsub import events
+from annatar.indexers import jackett
 from annatar.stremio import Stream, StreamResponse
 from annatar.torrent import Category, TorrentMeta
 
@@ -43,14 +41,13 @@ async def _search(
         log.debug("unique search")
         UNIQUE_SEARCHES.inc()
 
-    await events.SearchRequest.publish(
-        events.SearchRequest(
-            imdb=imdb_id,
-            category=Category(type),
-            season=season_episode[0] if len(season_episode) == 2 else None,
-            episode=season_episode[1] if len(season_episode) == 2 else None,
-        )
+    await jackett.trigger_search(
+        imdb=imdb_id,
+        category=Category(type),
+        season=season_episode[0] if len(season_episode) == 2 else None,
+        episode=season_episode[1] if len(season_episode) == 2 else None,
     )
+
     log.info("searching for stream links")
 
     stream_links: list[StreamLink] = await get_stream_links(
@@ -76,48 +73,6 @@ async def _search(
     return StreamResponse(streams=streams)
 
 
-async def wait_for_results(
-    q: asyncio.Queue[events.TorrentAdded],
-    imdb: str,
-    season: int,
-    episode: int,
-    max_results: int,
-) -> None:
-    num_results = 0
-    while num_results < max_results:
-        new_torrent = await q.get()
-        if (
-            new_torrent.imdb == imdb
-            and new_torrent.season == season
-            and new_torrent.episode == episode
-        ):
-            num_results += 1
-
-
-async def wait_for_new_torrents(
-    imdb: str,
-    season: int,
-    episode: int,
-    max_results: int,
-):
-    q = asyncio.Queue[events.TorrentAdded]()
-    tasks = [
-        asyncio.create_task(
-            events.TorrentAdded.listen(q, f"stream_links:{imdb}:{season}:{episode}")
-        ),
-        asyncio.create_task(wait_for_results(q, imdb, season, episode, max_results // 3)),
-    ]
-    with contextlib.suppress(asyncio.TimeoutError):
-        await asyncio.wait(
-            return_when=asyncio.FIRST_EXCEPTION,
-            timeout=SEARCH_TIMEOUT,
-            fs=tasks,
-        )
-    for task in tasks:
-        if not task.done():
-            task.cancel()
-
-
 async def get_stream_links(
     debrid: DebridService,
     imdb: str,
@@ -140,19 +95,6 @@ async def get_stream_links(
         filters=filters,
     )
     log.debug("done retrieving torrents from cache", count=len(torrents))
-    if len(torrents) == 0:
-        is_stale = await db.try_lock(f"stream_links:{imdb}:{season}", timeout=timedelta(hours=1))
-        if is_stale:
-            log.info(
-                "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
-            )
-            await wait_for_new_torrents(imdb, season, episode, max_results)
-            torrents = await odm.list_torrents(
-                imdb=imdb,
-                season=season,
-                episode=episode,
-                filters=filters,
-            )
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0

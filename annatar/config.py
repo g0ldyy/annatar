@@ -1,7 +1,7 @@
 import json
 import os
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import structlog
 from pydantic import BaseModel, ValidationError, root_validator
@@ -15,6 +15,9 @@ DEFAULT_INDEXERS = (
 )
 
 
+NAMESPACE: str = os.getenv("NAMESPACE") or "annatar"
+NUM_CORES: int = os.cpu_count() or 1
+WORKERS = int(os.getenv("WORKERS") or 2 * NUM_CORES)
 APP_ID = os.getenv("APP_ID", "community.annatar.addon.stremio")
 APP_NAME = os.getenv("APP_NAME", "Annatar")
 BUILD_VERSION: str = os.getenv("BUILD_VERSION", "UNKNOWN")
@@ -28,6 +31,10 @@ PROM_DIR = os.getenv(
 VERSION = os.getenv("BUILD_VERSION") or "0.0.1"
 
 RESOLUTION_FILTERS = [f for f in by_category("Resolution")]
+
+JACKETT_CACHE_MINUTES = timedelta(minutes=int(os.environ.get("JACKETT_CACHE_MINUTES", "60")))
+JACKETT_TIMEOUT = int(os.getenv("JACKETT_TIMEOUT") or 60)
+JACKETT_MAX_RESULTS = int(os.getenv("JACKETT_MAX_RESULTS") or 100)
 
 
 class UserConfig(BaseModel):

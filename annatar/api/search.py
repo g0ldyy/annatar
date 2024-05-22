@@ -13,7 +13,7 @@ from annatar import stremio
 from annatar.api.core import streams
 from annatar.database import db, odm
 from annatar.debrid.providers import all_providers, get_provider
-from annatar.pubsub import events
+from annatar.indexers import jackett
 from annatar.torrent import Category
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -81,13 +81,11 @@ async def search_imdb(
     limit: Annotated[int, Query(description="Limit results")] = 10,
     timeout: Annotated[int, Query(description="Search timeout", le=10, ge=1)] = 10,
 ) -> MediaResponse:
-    await events.SearchRequest.publish(
-        request=events.SearchRequest(
-            imdb=imdb_id,
-            category=category,
-            season=season,
-            episode=episode,
-        )
+    await jackett.trigger_search(
+        imdb=imdb_id,
+        category=category,
+        season=season,
+        episode=episode,
     )
 
     torrents: list[str] = await odm.list_torrents(
