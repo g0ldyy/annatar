@@ -1,5 +1,7 @@
 # Annatar - Lord of Gifts
 
+:warning: :warning: :warning: :warning: [Project is EOL](https://gitlab.com/stremio-add-ons/annatar/-/issues/40) :warning: :warning: :warning: :warning:
+
 ![](https://i.imgur.com/UIVsFy7.png)
 
 Annatar is free as in beer. If you are feeling generous I accept donations at [Ko-fi](https://ko-fi.com/annatar).
