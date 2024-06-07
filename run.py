@@ -71,6 +71,7 @@ if __name__ == "__main__":
         "annatar.main:app",
         host=config.HOST,
         port=config.PORT,
+        proxy_headers=True,
         reload=False,
         workers=WORKERS,
         loop="uvloop",
