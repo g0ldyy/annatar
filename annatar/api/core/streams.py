@@ -66,7 +66,7 @@ async def _search(
     sorted_links: list[StreamLink] = list(
         sorted(
             chain(stream_links),
-            key=lambda x: human.rank_quality(x.name),
+            key=lambda x: (human.rank_quality(x.name), float(x.size)),
             reverse=True,
         )
     )
