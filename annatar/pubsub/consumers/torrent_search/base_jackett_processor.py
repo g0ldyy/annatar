@@ -16,7 +16,7 @@ log = structlog.get_logger(__name__)
 
 JACKETT_TIMEOUT = 60
 JACKETT_MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 100))
-JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 6))
+JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 60))
 
 
 class BaseJackettProcessor(BaseModel):
@@ -75,12 +75,12 @@ class BaseJackettProcessor(BaseModel):
     ):
         log.debug("processing search request", request=request, indexer=self.indexer)
         tasks = [
-            jackett.search_imdb(
-                imdb=request.imdb,
-                indexers=[self.indexer],
-                category=request.category,
-                timeout=JACKETT_TIMEOUT,
-            ),
+            # jackett.search_imdb(
+            #     imdb=request.imdb,
+            #     indexers=[self.indexer],
+            #     category=request.category,
+            #     timeout=JACKETT_TIMEOUT,
+            # ),
             jackett.search(
                 query=media_info.name,
                 indexers=[self.indexer],
