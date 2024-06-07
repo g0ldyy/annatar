@@ -75,12 +75,12 @@ class BaseJackettProcessor(BaseModel):
     ):
         log.debug("processing search request", request=request, indexer=self.indexer)
         tasks = [
-            # jackett.search_imdb(
-            #     imdb=request.imdb,
-            #     indexers=[self.indexer],
-            #     category=request.category,
-            #     timeout=JACKETT_TIMEOUT,
-            # ),
+            jackett.search_imdb(
+                imdb=request.imdb,
+                indexers=[self.indexer],
+                category=request.category,
+                timeout=JACKETT_TIMEOUT,
+            ),
             jackett.search(
                 query=media_info.name,
                 indexers=[self.indexer],
