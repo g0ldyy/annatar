@@ -1,0 +1,13 @@
+fastapi
+pydantic
+aiohttp
+uvicorn
+redislite
+jinja2
+uvloop
+prometheus-client
+parse-torrent-title
+pyyaml
+ruff
+pytest-asyncio
+levenshtein
