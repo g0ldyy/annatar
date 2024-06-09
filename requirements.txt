@@ -11,3 +11,5 @@ pyyaml
 ruff
 pytest-asyncio
 levenshtein
+structlog
+bencodepy

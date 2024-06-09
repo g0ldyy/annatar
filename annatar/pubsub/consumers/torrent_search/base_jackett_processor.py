@@ -14,7 +14,6 @@ from annatar.torrent import Category, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
-JACKETT_TIMEOUT = 60
 JACKETT_MAX_RESULTS = int(os.environ.get("JACKETT_MAX_RESULTS", 100))
 JACKETT_TIMEOUT = int(os.environ.get("JACKETT_TIMEOUT", 60))
 

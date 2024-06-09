@@ -99,7 +99,6 @@ async def wait_for_new_torrents(
     season: int,
     episode: int,
     max_results: int,
-    torrent_resolution_done: asyncio.Event,
 ):
     q = asyncio.Queue[events.TorrentAdded]()
     tasks = [
@@ -117,7 +116,6 @@ async def wait_for_new_torrents(
     for task in tasks:
         if not task.done():
             task.cancel()
-    torrent_resolution_done.set()
 
 
 async def get_stream_links(
@@ -130,8 +128,10 @@ async def get_stream_links(
 ) -> list[StreamLink]:
     log.debug("getting stream links", imdb=imdb, max_results=max_results, filters=filters)
 
-    torrent_resolution_done = asyncio.Event()
-
+    # this is essentially a countdown. The timeout is how long the lock will be
+    # held for. If we can lock it then we likely just kicked off a new search so
+    # we should poll the database for new torrents. If we can't lock it then we
+    # should only search once
     log.debug("retrieving torrents from cache", imdb=imdb, season=season, episode=episode)
     torrents: list[str] = await odm.list_torrents(
         imdb=imdb,
@@ -140,28 +140,24 @@ async def get_stream_links(
         filters=filters,
     )
     log.debug("done retrieving torrents from cache", count=len(torrents))
-
     if len(torrents) == 0:
         is_stale = await db.try_lock(f"stream_links:{imdb}:{season}", timeout=timedelta(hours=1))
         if is_stale:
             log.info(
                 "data is stale, waiting for new results", imdb=imdb, season=season, episode=episode
             )
-            await wait_for_new_torrents(imdb, season, episode, max_results, torrent_resolution_done)
+            await wait_for_new_torrents(imdb, season, episode, max_results)
             torrents = await odm.list_torrents(
                 imdb=imdb,
                 season=season,
                 episode=episode,
                 filters=filters,
             )
-    else:
-        torrent_resolution_done.set()
 
     resolution_links: dict[str, list[StreamLink]] = defaultdict(list)
     total_links: int = 0
     total_processed: int = 0
     stop = asyncio.Event()
-
     async for link in debrid.get_stream_links(
         torrents=torrents,
         season=season,
@@ -187,8 +183,6 @@ async def get_stream_links(
             log.debug("max results total")
             stop.set()
             break
-
-    await torrent_resolution_done.wait()
 
     return list(chain.from_iterable(resolution_links.values()))
 

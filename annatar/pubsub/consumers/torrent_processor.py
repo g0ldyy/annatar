@@ -206,7 +206,14 @@ async def resolve_magnet_link(guid: str, link: str) -> str | None:
 
             # info_hash = magnet.parse_magnet_link(location)
 
-            info_hash = await magnet.get_info_hash(response)
+            if response.status == 200:
+                info_hash = await magnet.get_info_hash(response)
+            else:
+                location = response.headers.get("Location", "")
+                if not location:
+                    return None
+
+                info_hash = magnet.parse_magnet_link(location)
 
             log.debug("magnet resolve: found redirect", info_hash=info_hash, location=link)
             await db.set(cache_key, info_hash, ttl=timedelta(weeks=8))
