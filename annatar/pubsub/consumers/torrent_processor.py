@@ -76,9 +76,9 @@ async def process_message(result: TorrentSearchResult):
     if not torrent:
         return
 
-    if result.imdb != criteria.imdb and not torrent.matches_name(criteria.query):
-        log.info("skipping mismatched title", wanted=criteria.query, got=torrent.title)
-        return
+    # if result.imdb != criteria.imdb and not torrent.matches_name(criteria.query):
+    #     log.info("skipping mismatched title", wanted=criteria.query, got=torrent.title)
+    #     return
 
     ttl = timedelta(weeks=8)
     if result.search_criteria.category == Category.Movie:

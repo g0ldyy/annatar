@@ -21,7 +21,7 @@ from annatar.torrent import Category, TorrentMeta
 
 log = structlog.get_logger(__name__)
 
-SEARCH_TIMEOUT = int(os.getenv("SEARCH_TIMEOUT") or 10)
+SEARCH_TIMEOUT = int(os.getenv("SEARCH_TIMEOUT") or 15)
 UNIQUE_SEARCHES: Counter = Counter(
     name="unique_searches",
     documentation="Unique stream search counter",
